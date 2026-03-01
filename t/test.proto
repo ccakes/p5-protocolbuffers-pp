@@ -1,0 +1,30 @@
+syntax = "proto3";
+package test;
+
+enum Color {
+  RED = 0;
+  GREEN = 1;
+  BLUE = 2;
+}
+
+message Inner {
+  int32 value = 1;
+  string label = 2;
+}
+
+message Simple {
+  int32 id = 1;
+  string name = 2;
+  bool active = 3;
+  double score = 4;
+  Inner inner = 5;
+  repeated int32 tags = 6;
+  repeated Inner items = 7;
+  Color color = 8;
+  map<string, int32> metadata = 9;
+  oneof test_oneof {
+    string str_val = 10;
+    int32 int_val = 11;
+  }
+  optional int32 opt_field = 12;
+}

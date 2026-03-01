@@ -1,0 +1,99 @@
+package ProtocolBuffers::PP::Any;
+use strict;
+use warnings;
+use ProtocolBuffers::PP::Error;
+
+use Exporter 'import';
+our @EXPORT_OK = qw(any_to_json json_to_any);
+
+# WKT full names that get {"@type": ..., "value": ...} format
+my %WKT_VALUE_TYPES = map { $_ => 1 } qw(
+    google.protobuf.Timestamp
+    google.protobuf.Duration
+    google.protobuf.FieldMask
+    google.protobuf.Struct
+    google.protobuf.Value
+    google.protobuf.ListValue
+    google.protobuf.BoolValue
+    google.protobuf.Int32Value
+    google.protobuf.Int64Value
+    google.protobuf.UInt32Value
+    google.protobuf.UInt64Value
+    google.protobuf.FloatValue
+    google.protobuf.DoubleValue
+    google.protobuf.StringValue
+    google.protobuf.BytesValue
+);
+
+sub any_to_json {
+    my ($msg, %opts) = @_;
+    my $type_url = $msg->{type_url} || '';
+    my $type_registry = $opts{type_registry} || {};
+    my $json_printer = $opts{json_printer};
+
+    # Extract full name from type_url
+    my $full_name = $type_url;
+    $full_name =~ s{^.*/}{};  # strip everything before last /
+
+    my $reg_entry = $type_registry->{$full_name};
+    unless ($reg_entry) {
+        ProtocolBuffers::PP::Error->throw('json', "Unknown type in Any: $type_url");
+    }
+
+    # Decode the value bytes
+    my $descriptor = $reg_entry->{descriptor};
+    my $inner_msg = ProtocolBuffers::PP::Decode::decode_message($descriptor, $msg->{value} || '', $descriptor);
+
+    if ($WKT_VALUE_TYPES{$full_name} && $json_printer) {
+        # WKT: use {"@type": ..., "value": ...}
+        my $value_json = $json_printer->($inner_msg, $descriptor);
+        return { '@type' => $type_url, value => $value_json };
+    }
+
+    # Regular message: merge @type into the JSON object
+    my $json_hash = $json_printer ? $json_printer->($inner_msg, $descriptor) : {};
+    if (ref $json_hash eq 'HASH') {
+        return { '@type' => $type_url, %$json_hash };
+    }
+    return { '@type' => $type_url, value => $json_hash };
+}
+
+sub json_to_any {
+    my ($json_data, %opts) = @_;
+    my $type_registry = $opts{type_registry} || {};
+    my $json_parser = $opts{json_parser};
+
+    my $type_url = $json_data->{'@type'};
+    unless ($type_url) {
+        ProtocolBuffers::PP::Error->throw('json', 'Any missing @type field');
+    }
+
+    my $full_name = $type_url;
+    $full_name =~ s{^.*/}{};
+
+    my $reg_entry = $type_registry->{$full_name};
+    unless ($reg_entry) {
+        ProtocolBuffers::PP::Error->throw('json', "Unknown type in Any: $type_url");
+    }
+
+    my $descriptor = $reg_entry->{descriptor};
+    my $inner_msg;
+
+    if ($WKT_VALUE_TYPES{$full_name} && exists $json_data->{value}) {
+        $inner_msg = $json_parser->($json_data->{value}, $descriptor) if $json_parser;
+    } else {
+        # Regular message: remove @type, parse remaining
+        my %remaining = %$json_data;
+        delete $remaining{'@type'};
+        $inner_msg = $json_parser->(\%remaining, $descriptor) if $json_parser;
+    }
+
+    my $encoded = ProtocolBuffers::PP::Encode::encode_message($inner_msg || {}, $descriptor);
+
+    return {
+        type_url => $type_url,
+        value    => $encoded,
+    };
+}
+
+1;

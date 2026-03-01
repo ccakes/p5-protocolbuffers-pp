@@ -1,0 +1,262 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+no warnings 'portable';
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+
+# Redirect stderr to a log file for debugging
+close STDERR;
+open STDERR, '>>', '/tmp/perl-conformance-harness.log';
+
+# Load runtime
+use ProtocolBuffers::PP::Encode qw(encode_message);
+use ProtocolBuffers::PP::Decode qw(decode_message);
+use ProtocolBuffers::PP::JSON::Print;
+use ProtocolBuffers::PP::JSON::Parse;
+use ProtocolBuffers::PP::Error;
+
+# Load generated conformance types
+do "$FindBin::RealBin/../lib/Google/Protobuf/Any.pm" or die "Failed to load Any: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Timestamp.pm" or die "Failed to load Timestamp: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Duration.pm" or die "Failed to load Duration: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Field_mask.pm" or die "Failed to load FieldMask: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Wrappers.pm" or die "Failed to load Wrappers: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Test_messages_proto3.pm" or die "Failed to load Proto3: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Test_messages_proto2.pm" or die "Failed to load Proto2: $@";
+do "$FindBin::RealBin/../lib/Conformance/Conformance.pm" or die "Failed to load Conformance: $@";
+
+binmode(STDIN,  ':raw');
+binmode(STDOUT, ':raw');
+binmode(STDERR, ':raw');
+
+# Message type -> class/descriptor mapping
+my %MESSAGE_TYPES = (
+    'protobuf_test_messages.proto3.TestAllTypesProto3' => {
+        class => 'Protobuf_test_messages::Proto3::TestAllTypesProto3',
+    },
+    'protobuf_test_messages.proto2.TestAllTypesProto2' => {
+        class => 'Protobuf_test_messages::Proto2::TestAllTypesProto2',
+    },
+    'conformance.FailureSet' => {
+        class => 'Conformance::FailureSet',
+    },
+);
+
+# Build type registry for Any resolution
+my %TYPE_REGISTRY;
+sub _register_type {
+    my ($class) = @_;
+    my $desc = $class->__DESCRIPTOR__;
+    $TYPE_REGISTRY{$desc->{full_name}} = { descriptor => $desc, class => $class };
+    # Recurse into nested message fields
+    for my $fn (keys %{$desc->{fields}}) {
+        my $fd = $desc->{fields}{$fn};
+        if ($fd->{message_descriptor} && $fd->{message_descriptor}{_class}) {
+            my $sub_class = $fd->{message_descriptor}{_class};
+            my $sub_full = $fd->{message_descriptor}{full_name} || '';
+            next if $TYPE_REGISTRY{$sub_full};
+            $TYPE_REGISTRY{$sub_full} = { descriptor => $fd->{message_descriptor}, class => $sub_class };
+        }
+    }
+}
+
+# Register well-known types
+for my $wkt_class (qw(
+    Google::Protobuf::Any
+    Google::Protobuf::Timestamp
+    Google::Protobuf::Duration
+    Google::Protobuf::FieldMask
+    Google::Protobuf::BoolValue
+    Google::Protobuf::Int32Value
+    Google::Protobuf::Int64Value
+    Google::Protobuf::UInt32Value
+    Google::Protobuf::UInt64Value
+    Google::Protobuf::FloatValue
+    Google::Protobuf::DoubleValue
+    Google::Protobuf::StringValue
+    Google::Protobuf::BytesValue
+    Google::Protobuf::Struct
+    Google::Protobuf::Value
+    Google::Protobuf::ListValue
+)) {
+    eval { _register_type($wkt_class) };
+}
+
+# Register test message types
+for my $mt_class (values %MESSAGE_TYPES) {
+    eval { _register_type($mt_class->{class}) };
+}
+
+my $req_desc = Conformance::ConformanceRequest->__DESCRIPTOR__;
+my $resp_desc = Conformance::ConformanceResponse->__DESCRIPTOR__;
+my $test_count = 0;
+
+while (1) {
+    # Read 4-byte little-endian length
+    my $len_buf;
+    my $nread = read(STDIN, $len_buf, 4);
+    last if !defined $nread || $nread == 0;  # EOF
+    if ($nread != 4) {
+        die "Failed to read length prefix\n";
+    }
+
+    my $msg_len = unpack("V", $len_buf);
+    if ($msg_len == 0) {
+        # Empty message = exit signal
+        last;
+    }
+
+    # Read payload
+    my $payload = '';
+    while (length($payload) < $msg_len) {
+        my $chunk;
+        my $to_read = $msg_len - length($payload);
+        my $n = read(STDIN, $chunk, $to_read);
+        if (!defined $n || $n == 0) {
+            die "Unexpected EOF reading payload\n";
+        }
+        $payload .= $chunk;
+    }
+
+    # Process request (catch any die)
+    my $response;
+    eval {
+        $response = process_request($payload);
+    };
+    if ($@) {
+        my $err = "$@";
+        $err =~ s/\n.*//s;
+        $response = { runtime_error => "Harness error: $err", _oneof_case => { 0 => 2 } };
+    }
+
+    # Encode response
+    my $resp_bytes = encode_message($response, $resp_desc);
+
+    # Ensure bytes mode (downgrade from Perl internal UTF-8 to bytes)
+    utf8::downgrade($resp_bytes, 1) or utf8::encode($resp_bytes);
+
+    # Write length + response
+    print pack("V", length($resp_bytes));
+    print $resp_bytes;
+    STDOUT->flush();
+
+    $test_count++;
+}
+
+sub process_request {
+    my ($payload) = @_;
+
+    # Decode ConformanceRequest
+    my $request;
+    eval {
+        $request = decode_message($req_desc, $payload, $req_desc);
+    };
+    if ($@) {
+        return { runtime_error => "Failed to decode ConformanceRequest: $@",
+                 _oneof_case => { 0 => 2 } };
+    }
+
+    my $message_type = $request->{message_type} || '';
+
+    # Handle FailureSet request
+    if ($message_type eq 'conformance.FailureSet') {
+        my $failure_set = {};
+        my $fs_desc = Conformance::FailureSet->__DESCRIPTOR__;
+        my $encoded = encode_message($failure_set, $fs_desc);
+        return { protobuf_payload => $encoded, _oneof_case => { 0 => 3 } };
+    }
+
+    # Check message type
+    my $mt_info = $MESSAGE_TYPES{$message_type};
+    unless ($mt_info) {
+        return { skipped => "Unsupported message type: $message_type",
+                 _oneof_case => { 0 => 5 } };
+    }
+
+    my $msg_class = $mt_info->{class};
+    my $msg_desc = $msg_class->__DESCRIPTOR__;
+
+    # Get requested output format
+    my $output_format = $request->{requested_output_format} || 0;
+
+    # Skip JSPB and TEXT_FORMAT
+    if ($output_format == 3 || $output_format == 4) {  # JSPB, TEXT_FORMAT
+        return { skipped => "Unsupported output format",
+                 _oneof_case => { 0 => 5 } };
+    }
+
+    my $test_category = $request->{test_category} || 0;
+
+    # Parse input
+    my $msg;
+    my $oneof_case = $request->{_oneof_case} || {};
+    my $payload_case = $oneof_case->{0};
+
+    if (defined $payload_case && $payload_case == 1) {
+        # protobuf_payload
+        eval {
+            $msg = decode_message($msg_desc, $request->{protobuf_payload} // '', $msg_desc);
+        };
+        if ($@) {
+            my $err = "$@";
+            $err =~ s/\n.*//s;
+            return { parse_error => "Protobuf parse error: $err",
+                     _oneof_case => { 0 => 1 } };
+        }
+    } elsif (defined $payload_case && $payload_case == 2) {
+        # json_payload
+        my $ignore_unknown = ($test_category == 3) ? 1 : 0;  # JSON_IGNORE_UNKNOWN_PARSING_TEST
+        eval {
+            $msg = ProtocolBuffers::PP::JSON::Parse::parse_message(
+                $request->{json_payload} // '{}',
+                $msg_desc,
+                ignore_unknown_fields => $ignore_unknown,
+                type_registry => \%TYPE_REGISTRY,
+            );
+        };
+        if ($@) {
+            my $err = "$@";
+            $err =~ s/\n.*//s;
+            return { parse_error => "JSON parse error: $err",
+                     _oneof_case => { 0 => 1 } };
+        }
+    } elsif (defined $payload_case && ($payload_case == 7 || $payload_case == 8)) {
+        # jspb_payload or text_payload
+        return { skipped => "Unsupported input format",
+                 _oneof_case => { 0 => 5 } };
+    } else {
+        return { runtime_error => "No payload in request",
+                 _oneof_case => { 0 => 2 } };
+    }
+
+    # Serialize output
+    if ($output_format == 1) {  # PROTOBUF
+        my $encoded;
+        eval {
+            $encoded = encode_message($msg, $msg_desc);
+        };
+        if ($@) {
+            return { serialize_error => "Protobuf serialize error: $@",
+                     _oneof_case => { 0 => 6 } };
+        }
+        return { protobuf_payload => $encoded, _oneof_case => { 0 => 3 } };
+    } elsif ($output_format == 2) {  # JSON
+        my $json;
+        eval {
+            $json = ProtocolBuffers::PP::JSON::Print::print_message(
+                $msg, $msg_desc,
+                type_registry => \%TYPE_REGISTRY,
+            );
+        };
+        if ($@) {
+            return { serialize_error => "JSON serialize error: $@",
+                     _oneof_case => { 0 => 6 } };
+        }
+        return { json_payload => $json, _oneof_case => { 0 => 4 } };
+    } else {
+        return { skipped => "Unsupported output format: $output_format",
+                 _oneof_case => { 0 => 5 } };
+    }
+}

@@ -1,0 +1,49 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+
+use ProtocolBuffers::PP::Bootstrap;
+use ProtocolBuffers::PP::Decode qw(decode_message);
+use ProtocolBuffers::PP::Encode qw(encode_message);
+use ProtocolBuffers::PP::Generator;
+
+# Read binary CodeGeneratorRequest from stdin
+binmode(STDIN);
+binmode(STDOUT);
+binmode(STDERR);
+
+my $input = do { local $/; <STDIN> };
+
+# Decode using bootstrap descriptors
+my $req_desc = ProtocolBuffers::PP::Bootstrap::code_generator_request_descriptor();
+my $request;
+eval {
+    $request = decode_message($req_desc, $input, $req_desc);
+};
+if ($@) {
+    # Write error response
+    my $resp_desc = ProtocolBuffers::PP::Bootstrap::code_generator_response_descriptor();
+    my $resp = { error => "Failed to decode CodeGeneratorRequest: $@" };
+    print encode_message($resp, $resp_desc);
+    exit 0;
+}
+
+# Generate
+my $generator = ProtocolBuffers::PP::Generator->new(request => $request);
+my $response;
+eval {
+    $response = $generator->generate();
+};
+if ($@) {
+    my $resp_desc = ProtocolBuffers::PP::Bootstrap::code_generator_response_descriptor();
+    my $resp = { error => "Code generation failed: $@" };
+    print encode_message($resp, $resp_desc);
+    exit 0;
+}
+
+# Encode response
+my $resp_desc = ProtocolBuffers::PP::Bootstrap::code_generator_response_descriptor();
+my $output = encode_message($response, $resp_desc);
+print $output;
