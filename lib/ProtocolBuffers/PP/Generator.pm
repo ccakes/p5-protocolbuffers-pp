@@ -117,6 +117,12 @@ sub _generate_file {
         $code .= $self->_generate_message($msg, $full, $syntax);
     }
 
+    # Generate service client stubs
+    for my $svc (@{$file->{service} || []}) {
+        my $full = $pkg ? "$pkg.$svc->{name}" : $svc->{name};
+        $code .= $self->_generate_service($svc, $full, $pkg);
+    }
+
     $code .= "1;\n";
     return $code;
 }
@@ -344,6 +350,54 @@ sub _generate_message {
 
     $code .= "} # end package $perl_class\n\n";
 
+    return $code;
+}
+
+sub _generate_service {
+    my ($self, $svc, $full_name, $package) = @_;
+    my $perl_class = _full_name_to_perl_class($full_name);
+    my $client_class = "${perl_class}::Client";
+
+    my $code = "{\npackage $client_class;\n";
+    $code .= "use strict;\nuse warnings;\n\n";
+
+    $code .= "sub new {\n";
+    $code .= "    my (\$class, \%args) = \@_;\n";
+    $code .= "    return bless { channel => \$args{channel} }, \$class;\n";
+    $code .= "}\n\n";
+
+    for my $method (@{$svc->{method} || []}) {
+        my $name   = $method->{name};
+        my $cs     = $method->{client_streaming} ? 1 : 0;
+        my $ss     = $method->{server_streaming} ? 1 : 0;
+        my $path   = "/$package.$svc->{name}/$name";
+        # Convert dotted package to slash-separated
+        $path =~ s/\./\//g while $path =~ /\./;
+        # Actually gRPC path uses dots: /package.Service/Method
+        $path = "/$package.$svc->{name}/$name";
+
+        my $rpc_type;
+        if (!$cs && !$ss) {
+            $rpc_type = 'unary';
+        } elsif (!$cs && $ss) {
+            $rpc_type = 'server_stream';
+        } elsif ($cs && !$ss) {
+            $rpc_type = 'client_stream';
+        } else {
+            $rpc_type = 'bidi_stream';
+        }
+
+        $code .= "sub $name {\n";
+        $code .= "    my (\$self, \$request, \%opts) = \@_;\n";
+        $code .= "    return \$self->{channel}->$rpc_type(\n";
+        $code .= "        " . _quote($path) . ",\n";
+        $code .= "        \$request,\n";
+        $code .= "        \%opts,\n";
+        $code .= "    );\n";
+        $code .= "}\n\n";
+    }
+
+    $code .= "} # end package $client_class\n\n";
     return $code;
 }
 

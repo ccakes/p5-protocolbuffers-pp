@@ -14,6 +14,9 @@ my $VERSION_DESC;
 my $FILE_OPTIONS_DESC;
 my $MESSAGE_OPTIONS_DESC;
 my $FIELD_OPTIONS_DESC;
+my $METHOD_OPTIONS_DESC;
+my $METHOD_DESC;
+my $SERVICE_DESC;
 my $ENUM_VALUE_DESC;
 my $ENUM_DESC;
 my $ONEOF_DESC;
@@ -68,6 +71,44 @@ $FIELD_OPTIONS_DESC = {
     syntax => 'proto2',
     fields => {
         2 => { name => 'packed', number => 2, type => TYPE_BOOL, label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+    },
+    oneofs => [],
+    is_map_entry => 0,
+};
+
+$METHOD_OPTIONS_DESC = {
+    full_name => 'google.protobuf.MethodOptions',
+    syntax => 'proto2',
+    fields => {
+        34 => { name => 'idempotency_level', number => 34, type => TYPE_ENUM, label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+    },
+    oneofs => [],
+    is_map_entry => 0,
+};
+
+$METHOD_DESC = {
+    full_name => 'google.protobuf.MethodDescriptorProto',
+    syntax => 'proto2',
+    fields => {
+        1 => { name => 'name',             number => 1, type => TYPE_STRING,  label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+        2 => { name => 'input_type',       number => 2, type => TYPE_STRING,  label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+        3 => { name => 'output_type',      number => 3, type => TYPE_STRING,  label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+        4 => { name => 'options',          number => 4, type => TYPE_MESSAGE, label => LABEL_OPTIONAL, packed => 0, oneof_index => undef,
+                message_descriptor => $METHOD_OPTIONS_DESC },
+        5 => { name => 'client_streaming', number => 5, type => TYPE_BOOL,   label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+        6 => { name => 'server_streaming', number => 6, type => TYPE_BOOL,   label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+    },
+    oneofs => [],
+    is_map_entry => 0,
+};
+
+$SERVICE_DESC = {
+    full_name => 'google.protobuf.ServiceDescriptorProto',
+    syntax => 'proto2',
+    fields => {
+        1 => { name => 'name',    number => 1, type => TYPE_STRING,  label => LABEL_OPTIONAL, packed => 0, oneof_index => undef },
+        2 => { name => 'method',  number => 2, type => TYPE_MESSAGE, label => LABEL_REPEATED, packed => 0, oneof_index => undef,
+                message_descriptor => $METHOD_DESC },
     },
     oneofs => [],
     is_map_entry => 0,
@@ -188,6 +229,8 @@ $FILE_DESCRIPTOR_PROTO = {
                 message_descriptor => $DESCRIPTOR_PROTO },
         5  => { name => 'enum_type',        number => 5,  type => TYPE_MESSAGE, label => LABEL_REPEATED, packed => 0, oneof_index => undef,
                 message_descriptor => $ENUM_DESC },
+        6  => { name => 'service',         number => 6,  type => TYPE_MESSAGE, label => LABEL_REPEATED, packed => 0, oneof_index => undef,
+                message_descriptor => $SERVICE_DESC },
         7  => { name => 'extension',        number => 7,  type => TYPE_MESSAGE, label => LABEL_REPEATED, packed => 0, oneof_index => undef,
                 message_descriptor => $FIELD_DESC },
         8  => { name => 'options',          number => 8,  type => TYPE_MESSAGE, label => LABEL_OPTIONAL, packed => 0, oneof_index => undef,

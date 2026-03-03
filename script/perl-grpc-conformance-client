@@ -1,0 +1,341 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+no warnings 'portable';
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+
+# Redirect stderr to a log file for debugging
+open(my $ORIG_STDERR, ">&", \*STDERR) or die;
+open(STDERR, '>>', '/tmp/perl-grpc-conformance-client.log') or die;
+
+# Load runtime
+use ProtocolBuffers::PP::Encode qw(encode_message);
+use ProtocolBuffers::PP::Decode qw(decode_message);
+use ProtocolBuffers::PP::GRPC::Client;
+use ProtocolBuffers::PP::GRPC::Status qw(:all);
+use MIME::Base64 ();
+
+# Load generated types
+do "$FindBin::RealBin/../lib/Google/Protobuf/Any.pm"    or die "Failed to load Any: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Empty.pm"  or die "Failed to load Empty: $@";
+do "$FindBin::RealBin/../lib/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
+do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Config.pm"       or die "Failed to load Config: $@";
+do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Service.pm"      or die "Failed to load Service: $@";
+do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Client_compat.pm" or die "Failed to load Client_compat: $@";
+
+binmode(STDIN,  ':raw');
+binmode(STDOUT, ':raw');
+binmode(STDERR, ':raw');
+
+# Handle SIGTERM for clean shutdown (conformance runner sends this)
+$SIG{TERM} = sub { exit(0) };
+
+# Log uncaught die messages
+$SIG{__DIE__} = sub {
+    warn "UNCAUGHT DIE: $_[0]" unless $^S;  # only log if not in eval
+};
+
+my $req_desc  = Connectrpc::Conformance::V1::ClientCompatRequest->__DESCRIPTOR__;
+my $resp_desc = Connectrpc::Conformance::V1::ClientCompatResponse->__DESCRIPTOR__;
+my $payload_desc = Connectrpc::Conformance::V1::ConformancePayload->__DESCRIPTOR__;
+
+my $test_count = 0;
+while (1) {
+    # Read 4-byte big-endian length prefix
+    my $len_buf;
+    my $nread = read(STDIN, $len_buf, 4);
+    last if !defined $nread || $nread == 0;
+    if ($nread != 4) {
+        die "Failed to read length prefix (got $nread bytes)\n";
+    }
+
+    my $msg_len = unpack("N", $len_buf);
+    last if $msg_len == 0;
+
+    # Read payload
+    my $payload = '';
+    while (length($payload) < $msg_len) {
+        my $chunk;
+        my $n = read(STDIN, $chunk, $msg_len - length($payload));
+        if (!defined $n || $n == 0) {
+            die "Unexpected EOF reading payload\n";
+        }
+        $payload .= $chunk;
+    }
+
+    # Process request
+    my $response;
+    eval {
+        $response = process_request($payload);
+    };
+    if ($@) {
+        my $err = "$@";
+        $err =~ s/\n.*//s;
+        warn "Harness error: $err\n";
+        # Build an error response
+        my $test_name = '';
+        eval {
+            my $req = decode_message($req_desc, $payload, $req_desc);
+            $test_name = $req->{test_name} || '';
+        };
+        $response = {
+            test_name => $test_name,
+            error => { message => "Harness error: $err" },
+            _oneof_case => { 0 => 3 },
+        };
+    }
+
+    # Encode response
+    my $resp_bytes;
+    eval {
+        $resp_bytes = encode_message($response, $resp_desc);
+    };
+    if ($@) {
+        warn "ENCODE ERROR: $@\n";
+        # Build a minimal error response manually
+        $resp_bytes = '';
+    }
+    utf8::downgrade($resp_bytes, 1) or utf8::encode($resp_bytes);
+
+    $test_count++;
+    my $out_bytes = pack("N", length($resp_bytes)) . $resp_bytes;
+
+    # Write length + response as a single syswrite to avoid interleaving
+    syswrite(STDOUT, $out_bytes);
+}
+exit(0);
+
+sub process_request {
+    my ($payload) = @_;
+
+    my $req = decode_message($req_desc, $payload, $req_desc);
+    my $test_name = $req->{test_name} || '';
+
+    my $host        = $req->{host} || 'localhost';
+    my $port        = $req->{port} || 0;
+    my $stream_type = $req->{stream_type} || 0;
+    my $service     = $req->{service} || 'connectrpc.conformance.v1.ConformanceService';
+    my $method      = $req->{'method'} || '';
+    my $timeout_ms  = $req->{timeout_ms};
+    my $delay_ms    = $req->{request_delay_ms} || 0;
+    my $cancel      = $req->{cancel};
+
+    # Build gRPC path
+    my $path = "/$service/$method";
+
+    # Extract request message bytes from Any wrappers
+    my @request_bytes;
+    for my $any (@{$req->{request_messages} || []}) {
+        # The value field contains the already-encoded protobuf bytes
+        push @request_bytes, ($any->{value} // '');
+    }
+
+    # Build request headers from Header messages
+    my @headers;
+    for my $h (@{$req->{request_headers} || []}) {
+        push @headers, [$h->{name}, $h->{value} || []];
+    }
+
+    # Parse cancel config
+    my $cancel_opts;
+    if ($cancel) {
+        my $oneof_case = $cancel->{_oneof_case} || {};
+        my $cancel_field = $oneof_case->{0};
+        if (defined $cancel_field) {
+            if ($cancel_field == 1) {
+                # before_close_send
+                $cancel_opts = { before_close_send => 1 };
+            } elsif ($cancel_field == 2) {
+                # after_close_send_ms
+                $cancel_opts = { after_close_send_ms => $cancel->{after_close_send_ms} || 0 };
+            } elsif ($cancel_field == 3) {
+                # after_num_responses
+                $cancel_opts = { after_num_responses => $cancel->{after_num_responses} || 0 };
+            }
+        }
+    }
+
+    # Create gRPC client (fresh connection per request)
+    my $client;
+    eval {
+        $client = ProtocolBuffers::PP::GRPC::Client->new(
+            host => $host,
+            port => $port,
+        );
+    };
+    if ($@) {
+        my $err = "$@";
+        $err =~ s/\n.*//s;
+        return {
+            test_name => $test_name,
+            error => { message => "Connection failed: $err" },
+            _oneof_case => { 0 => 3 },
+        };
+    }
+
+    my $result;
+    eval {
+        my %opts = (
+            headers          => \@headers,
+            cancel           => $cancel_opts,
+            request_delay_ms => $delay_ms,
+        );
+        $opts{timeout} = $timeout_ms if defined $timeout_ms;
+
+        if ($stream_type == 1) {
+            # STREAM_TYPE_UNARY
+            $result = $client->unary($path, $request_bytes[0] // '', %opts);
+        } elsif ($stream_type == 2) {
+            # STREAM_TYPE_CLIENT_STREAM
+            $result = $client->client_stream($path, \@request_bytes, %opts);
+        } elsif ($stream_type == 3) {
+            # STREAM_TYPE_SERVER_STREAM
+            $result = $client->server_stream($path, $request_bytes[0] // '', %opts);
+        } elsif ($stream_type == 4) {
+            # STREAM_TYPE_HALF_DUPLEX_BIDI_STREAM
+            $result = $client->bidi_stream($path, \@request_bytes,
+                %opts, full_duplex => 0);
+        } elsif ($stream_type == 5) {
+            # STREAM_TYPE_FULL_DUPLEX_BIDI_STREAM
+            $result = $client->bidi_stream($path, \@request_bytes,
+                %opts, full_duplex => 1);
+        } else {
+            die "Unsupported stream type: $stream_type\n";
+        }
+    };
+    if ($@) {
+        my $err = "$@";
+        $err =~ s/\n.*//s;
+        return {
+            test_name => $test_name,
+            error => { message => "RPC failed: $err" },
+            _oneof_case => { 0 => 3 },
+        };
+    }
+
+    # Build ClientResponseResult
+    return build_response($test_name, $result);
+}
+
+sub build_response {
+    my ($test_name, $result) = @_;
+
+    # Decode response messages.
+    # All RPC response types (UnaryResponse, ServerStreamResponse, etc.)
+    # wrap ConformancePayload at field 1. Use a generic wrapper descriptor
+    # to extract the payload from any response type.
+    my $wrapper_desc = _get_response_wrapper_desc();
+    my @payloads;
+    for my $msg_bytes (@{$result->{messages} || []}) {
+        my $payload;
+        eval {
+            my $wrapper = decode_message($wrapper_desc, $msg_bytes, $wrapper_desc);
+            $payload = $wrapper->{payload};
+        };
+        if ($@) {
+            warn "Failed to decode response payload: $@\n";
+            next;
+        }
+        push @payloads, ($payload || {});
+    }
+
+    # Convert headers to conformance Header messages
+    my $resp_headers  = _to_conformance_headers($result->{headers});
+    my $resp_trailers = _to_conformance_headers($result->{trailers});
+
+    # Build error from gRPC status
+    my $error;
+    my $grpc_status = $result->{grpc_status};
+    if (defined $grpc_status && $grpc_status != 0) {
+        $error = {
+            code => $grpc_status,
+        };
+        # Set message as optional field
+        if (defined $result->{grpc_message}) {
+            $error->{message} = $result->{grpc_message};
+            $error->{_oneof_case} = { 0 => 2 };
+        }
+        # Parse error details from grpc-status-details-bin
+        if (defined $result->{status_details_bin}) {
+            eval {
+                my $status_desc = _get_google_rpc_status_desc();
+                my $status = decode_message($status_desc, $result->{status_details_bin}, $status_desc);
+                if ($status->{details} && @{$status->{details}}) {
+                    $error->{details} = $status->{details};
+                }
+            };
+            if ($@) {
+                warn "Failed to parse status details: $@\n";
+            }
+        }
+    }
+
+    my $response_result = {
+        response_headers  => $resp_headers,
+        payloads          => \@payloads,
+        response_trailers => $resp_trailers,
+    };
+    $response_result->{error} = $error if $error;
+
+    return {
+        test_name => $test_name,
+        response => $response_result,
+        _oneof_case => { 0 => 2 },
+    };
+}
+
+sub _to_conformance_headers {
+    my ($headers) = @_;
+    return [] unless $headers && @$headers;
+    my @result;
+    for my $h (@$headers) {
+        push @result, {
+            name  => $h->[0],
+            value => $h->[1],
+        };
+    }
+    return \@result;
+}
+
+# Generic response wrapper descriptor: all RPC response types have
+# ConformancePayload payload = 1;
+{
+    my $WRAPPER_DESC;
+    sub _get_response_wrapper_desc {
+        return $WRAPPER_DESC if $WRAPPER_DESC;
+        $WRAPPER_DESC = {
+            full_name => '_ResponseWrapper',
+            syntax => 'proto3',
+            fields => {
+                1 => { name => 'payload', number => 1, type => 11, label => 1, packed => 0, oneof_index => undef,
+                        message_descriptor => $payload_desc },
+            },
+            oneofs => [],
+            is_map_entry => 0,
+        };
+        return $WRAPPER_DESC;
+    }
+}
+
+# Minimal google.rpc.Status descriptor for decoding grpc-status-details-bin
+{
+    my $STATUS_DESC;
+    sub _get_google_rpc_status_desc {
+        return $STATUS_DESC if $STATUS_DESC;
+        my $any_desc = Google::Protobuf::Any->__DESCRIPTOR__;
+        $STATUS_DESC = {
+            full_name => 'google.rpc.Status',
+            syntax => 'proto3',
+            fields => {
+                1 => { name => 'code',    number => 1, type => 5,  label => 1, packed => 0, oneof_index => undef },
+                2 => { name => 'message', number => 2, type => 9,  label => 1, packed => 0, oneof_index => undef },
+                3 => { name => 'details', number => 3, type => 11, label => 3, packed => 0, oneof_index => undef,
+                        message_descriptor => $any_desc },
+            },
+            oneofs => [],
+            is_map_entry => 0,
+        };
+        return $STATUS_DESC;
+    }
+}

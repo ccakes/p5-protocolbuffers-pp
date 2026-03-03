@@ -1,0 +1,13 @@
+features:
+  versions:
+    - HTTP_VERSION_2
+  protocols:
+    - PROTOCOL_GRPC
+  codecs:
+    - CODEC_PROTO
+  compressions:
+    - COMPRESSION_IDENTITY
+  supportsTls: false
+  supportsConnectGet: false
+  supportsTlsClientCerts: false
+  supportsMessageReceiveLimit: false
