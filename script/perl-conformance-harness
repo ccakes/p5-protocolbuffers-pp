@@ -6,8 +6,8 @@ use FindBin;
 use lib "$FindBin::RealBin/../lib";
 
 # Redirect stderr to a log file for debugging
-close STDERR;
-open STDERR, '>>', '/tmp/perl-conformance-harness.log';
+open(my $ORIG_STDERR, ">&", \*STDERR) or die;
+open(STDERR, '>>', '/tmp/perl-conformance-harness.log') or die;
 
 # Load runtime
 use ProtocolBuffers::PP::Encode qw(encode_message);
@@ -17,15 +17,16 @@ use ProtocolBuffers::PP::JSON::Parse;
 use ProtocolBuffers::PP::Error;
 
 # Load generated conformance types
-do "$FindBin::RealBin/../lib/Google/Protobuf/Any.pm" or die "Failed to load Any: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Timestamp.pm" or die "Failed to load Timestamp: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Duration.pm" or die "Failed to load Duration: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Field_mask.pm" or die "Failed to load FieldMask: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Wrappers.pm" or die "Failed to load Wrappers: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Test_messages_proto3.pm" or die "Failed to load Proto3: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Test_messages_proto2.pm" or die "Failed to load Proto2: $@";
-do "$FindBin::RealBin/../lib/Conformance/Conformance.pm" or die "Failed to load Conformance: $@";
+my $gendir = $ENV{PROTOBUF_PP_GENDIR} || "$FindBin::RealBin/../lib";
+do "$gendir/Google/Protobuf/Any.pm" or die "Failed to load Any: $@";
+do "$gendir/Google/Protobuf/Timestamp.pm" or die "Failed to load Timestamp: $@";
+do "$gendir/Google/Protobuf/Duration.pm" or die "Failed to load Duration: $@";
+do "$gendir/Google/Protobuf/Field_mask.pm" or die "Failed to load FieldMask: $@";
+do "$gendir/Google/Protobuf/Wrappers.pm" or die "Failed to load Wrappers: $@";
+do "$gendir/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
+do "$gendir/Google/Protobuf/Test_messages_proto3.pm" or die "Failed to load Proto3: $@";
+do "$gendir/Google/Protobuf/Test_messages_proto2.pm" or die "Failed to load Proto2: $@";
+do "$gendir/Conformance/Conformance.pm" or die "Failed to load Conformance: $@";
 
 binmode(STDIN,  ':raw');
 binmode(STDOUT, ':raw');

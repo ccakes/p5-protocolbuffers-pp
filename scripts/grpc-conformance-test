@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+    cat <<EOF
+Usage: $0 --connectrpc-root DIR [extra runner args...]
+
+Run the ConnectRPC gRPC conformance test suite against ProtocolBuffers::PP.
+
+Options:
+  --connectrpc-root DIR   Path to the connectrpc-conformance source tree
+                          (or set \$CONNECTRPC_ROOT)
+
+The connectconformance binary is located at:
+  1. \$CONNECTRPC_ROOT/.tmp/bin/connectconformance
+  2. On \$PATH
+
+Example:
+  $0 --connectrpc-root ~/src/conformance
+EOF
+    exit 1
+}
+
+# Parse arguments
+CONNECTRPC_ROOT="${CONNECTRPC_ROOT:-}"
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --connectrpc-root)
+            CONNECTRPC_ROOT="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            ;;
+        *)
+            EXTRA_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$CONNECTRPC_ROOT" ]]; then
+    echo "Error: --connectrpc-root DIR or \$CONNECTRPC_ROOT is required" >&2
+    usage
+fi
+
+if [[ ! -d "$CONNECTRPC_ROOT/proto" ]]; then
+    echo "Error: $CONNECTRPC_ROOT/proto does not exist — is --connectrpc-root correct?" >&2
+    exit 1
+fi
+
+# Find connectconformance binary
+RUNNER=""
+if [[ -x "$CONNECTRPC_ROOT/.tmp/bin/connectconformance" ]]; then
+    RUNNER="$CONNECTRPC_ROOT/.tmp/bin/connectconformance"
+elif command -v connectconformance &>/dev/null; then
+    RUNNER="$(command -v connectconformance)"
+else
+    echo "Error: connectconformance not found." >&2
+    echo "  Checked: $CONNECTRPC_ROOT/.tmp/bin/connectconformance" >&2
+    echo "  Checked: \$PATH" >&2
+    exit 1
+fi
+
+# Create temp directory for generated code
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Generate Perl types into temp directory
+protoc \
+    --perl_out="$tmpdir" \
+    --plugin=protoc-gen-perl="$ROOT_DIR/script/protoc-gen-perl" \
+    -I "$CONNECTRPC_ROOT/proto" \
+    google/protobuf/any.proto \
+    google/protobuf/empty.proto \
+    google/protobuf/struct.proto \
+    connectrpc/conformance/v1/client_compat.proto \
+    connectrpc/conformance/v1/service.proto \
+    connectrpc/conformance/v1/config.proto
+
+echo "Generated types in $tmpdir"
+
+# Run the gRPC conformance test
+exec env PROTOBUF_PP_GENDIR="$tmpdir" \
+    "$RUNNER" \
+    --mode client \
+    --conf "$ROOT_DIR/conformance/grpc-client-config.yaml" \
+    --known-failing @"$ROOT_DIR/conformance/grpc-client-known-failing.txt" \
+    -- "$ROOT_DIR/script/perl-grpc-conformance-client" \
+    "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

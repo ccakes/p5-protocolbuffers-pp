@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+    cat <<EOF
+Usage: $0 --protobuf-root DIR [extra runner args...]
+
+Run the protobuf conformance test suite against ProtocolBuffers::PP.
+
+Options:
+  --protobuf-root DIR   Path to the protobuf source tree (or set \$PROTOBUF_ROOT)
+
+The conformance_test_runner binary is located at:
+  1. \$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner
+  2. On \$PATH
+
+Example:
+  $0 --protobuf-root ~/src/protobuf
+EOF
+    exit 1
+}
+
+# Parse arguments
+PROTOBUF_ROOT="${PROTOBUF_ROOT:-}"
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --protobuf-root)
+            PROTOBUF_ROOT="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            ;;
+        *)
+            EXTRA_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$PROTOBUF_ROOT" ]]; then
+    echo "Error: --protobuf-root DIR or \$PROTOBUF_ROOT is required" >&2
+    usage
+fi
+
+if [[ ! -d "$PROTOBUF_ROOT/src" ]]; then
+    echo "Error: $PROTOBUF_ROOT/src does not exist — is --protobuf-root correct?" >&2
+    exit 1
+fi
+
+# Find conformance_test_runner
+RUNNER=""
+if [[ -x "$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner" ]]; then
+    RUNNER="$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner"
+elif command -v conformance_test_runner &>/dev/null; then
+    RUNNER="$(command -v conformance_test_runner)"
+else
+    echo "Error: conformance_test_runner not found." >&2
+    echo "  Checked: $PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner" >&2
+    echo "  Checked: \$PATH" >&2
+    exit 1
+fi
+
+# Create temp directory for generated code
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Generate Perl types into temp directory
+protoc \
+    --perl_out="$tmpdir" \
+    --plugin=protoc-gen-perl="$ROOT_DIR/script/protoc-gen-perl" \
+    -I "$PROTOBUF_ROOT/src" \
+    google/protobuf/any.proto \
+    google/protobuf/timestamp.proto \
+    google/protobuf/duration.proto \
+    google/protobuf/field_mask.proto \
+    google/protobuf/wrappers.proto \
+    google/protobuf/struct.proto \
+    google/protobuf/test_messages_proto3.proto \
+    google/protobuf/test_messages_proto2.proto \
+    conformance/conformance.proto
+
+echo "Generated types in $tmpdir"
+
+# Run the conformance test
+exec env PROTOBUF_PP_GENDIR="$tmpdir" \
+    "$RUNNER" \
+    --failure_list "$ROOT_DIR/conformance/protobuf-known-failing.txt" \
+    "$ROOT_DIR/script/perl-conformance-harness" \
+    "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"

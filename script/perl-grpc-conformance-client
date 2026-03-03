@@ -17,12 +17,13 @@ use ProtocolBuffers::PP::GRPC::Status qw(:all);
 use MIME::Base64 ();
 
 # Load generated types
-do "$FindBin::RealBin/../lib/Google/Protobuf/Any.pm"    or die "Failed to load Any: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Empty.pm"  or die "Failed to load Empty: $@";
-do "$FindBin::RealBin/../lib/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
-do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Config.pm"       or die "Failed to load Config: $@";
-do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Service.pm"      or die "Failed to load Service: $@";
-do "$FindBin::RealBin/../lib/Connectrpc/Conformance/V1/Client_compat.pm" or die "Failed to load Client_compat: $@";
+my $gendir = $ENV{PROTOBUF_PP_GENDIR} || "$FindBin::RealBin/../lib";
+do "$gendir/Google/Protobuf/Any.pm"    or die "Failed to load Any: $@";
+do "$gendir/Google/Protobuf/Empty.pm"  or die "Failed to load Empty: $@";
+do "$gendir/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";
+do "$gendir/Connectrpc/Conformance/V1/Config.pm"       or die "Failed to load Config: $@";
+do "$gendir/Connectrpc/Conformance/V1/Service.pm"      or die "Failed to load Service: $@";
+do "$gendir/Connectrpc/Conformance/V1/Client_compat.pm" or die "Failed to load Client_compat: $@";
 
 binmode(STDIN,  ':raw');
 binmode(STDOUT, ':raw');

@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-RUNNER="$(which conformance_test_runner)"
-exec "$RUNNER" \
-  --failure_list "$SCRIPT_DIR/t/conformance/failure_list.txt" \
-  "$SCRIPT_DIR/script/perl-conformance-harness" "$@"
