@@ -11,10 +11,10 @@ ProtocolBuffers::PP is a pure-Perl Protocol Buffers implementation. It provides 
 prove -r t/unit/
 
 # Run the official protobuf conformance suite (2737/2737 passing)
-scripts/protobuf-conformance-test --protobuf-root /path/to/protobuf
+script/protobuf-conformance-test --protobuf-root /path/to/protobuf
 
 # Run the gRPC conformance suite (211/211 passing)
-scripts/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
+script/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
 
 # Generate Perl code from .proto files
 protoc --perl_out=lib/ --plugin=protoc-gen-perl=script/protoc-gen-perl \
@@ -59,10 +59,10 @@ Messages are plain Perl hashes (not blessed objects during encode/decode). Speci
 
 ### Conformance Testing
 
-Wrapper scripts under `scripts/` handle code generation into a temp directory and runner invocation:
+Wrapper scripts under `script/` handle code generation into a temp directory and runner invocation:
 
-- **scripts/protobuf-conformance-test** — Runs the official protobuf conformance suite. Accepts `--protobuf-root DIR` (or `$PROTOBUF_ROOT`). Generates types via `protoc`, finds `conformance_test_runner`, runs with `PROTOBUF_PP_GENDIR` set.
-- **scripts/grpc-conformance-test** — Runs the ConnectRPC gRPC conformance suite. Accepts `--connectrpc-root DIR` (or `$CONNECTRPC_ROOT`). Generates types via `protoc`, finds `connectconformance`, runs with `PROTOBUF_PP_GENDIR` set.
+- **script/protobuf-conformance-test** — Runs the official protobuf conformance suite. Accepts `--protobuf-root DIR` (or `$PROTOBUF_ROOT`). Generates types via `protoc`, finds `conformance_test_runner`, runs with `PROTOBUF_PP_GENDIR` set.
+- **script/grpc-conformance-test** — Runs the ConnectRPC gRPC conformance suite. Accepts `--connectrpc-root DIR` (or `$CONNECTRPC_ROOT`). Generates types via `protoc`, finds `connectconformance`, runs with `PROTOBUF_PP_GENDIR` set.
 
 Harness scripts under `script/`:
 

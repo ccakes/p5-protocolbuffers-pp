@@ -80,8 +80,7 @@ my $parsed = ProtocolBuffers::PP::JSON::Parse::parse_message($json, $desc);
 |---|---|
 | `lib/ProtocolBuffers/PP/` | Runtime: encoding, decoding, JSON mapping, gRPC client, wire format, WKT helpers |
 | `lib/ProtocolBuffers/Generated/` | Base classes for generated message/enum code |
-| `script/` | `protoc-gen-perl` plugin, conformance harness and gRPC client |
-| `scripts/` | Conformance test wrapper scripts (protobuf and gRPC) |
+| `script/` | `protoc-gen-perl` plugin, conformance harnesses, and test wrapper scripts |
 | `conformance/` | Conformance config and known-failing lists |
 | `docs/` | Feature documentation |
 | `t/unit/` | Unit tests |
@@ -93,10 +92,10 @@ my $parsed = ProtocolBuffers::PP::JSON::Parse::parse_message($json, $desc);
 prove -r t/unit/
 
 # Run the official protobuf conformance suite
-scripts/protobuf-conformance-test --protobuf-root /path/to/protobuf
+script/protobuf-conformance-test --protobuf-root /path/to/protobuf
 
 # Run the gRPC conformance suite
-scripts/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
+script/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
 ```
 
 The conformance wrapper scripts generate types into a temp directory via

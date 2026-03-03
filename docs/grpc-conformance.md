@@ -7,7 +7,7 @@ implementation using the
 ## Quick Start
 
 ```bash
-scripts/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
+script/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
 ```
 
 ## Current Status
@@ -82,7 +82,7 @@ All conformance protos live in the ConnectRPC repository under
 | `suite.proto` | Test suite / test case schema (YAML definitions) |
 
 These are compiled with `protoc-gen-perl` into a temp directory at test time
-by the `scripts/grpc-conformance-test` wrapper script.
+by the `script/grpc-conformance-test` wrapper script.
 
 ## ConformanceService
 
@@ -302,7 +302,7 @@ config (we only declare `PROTOCOL_GRPC`).
 ### Basic Run
 
 ```bash
-scripts/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
+script/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
 ```
 
 The wrapper script generates types into a temp directory and runs
@@ -311,11 +311,11 @@ through to the runner:
 
 ```bash
 # Run specific tests
-scripts/grpc-conformance-test --connectrpc-root /path/to/conformance \
+script/grpc-conformance-test --connectrpc-root /path/to/conformance \
   --run "Basic/**/unary/*"
 
 # Verbose output
-scripts/grpc-conformance-test --connectrpc-root /path/to/conformance -v
+script/grpc-conformance-test --connectrpc-root /path/to/conformance -v
 ```
 
 ### Environment Variable
@@ -324,7 +324,7 @@ Instead of `--connectrpc-root`, you can set `$CONNECTRPC_ROOT`:
 
 ```bash
 export CONNECTRPC_ROOT=/path/to/connectrpc-conformance
-scripts/grpc-conformance-test
+script/grpc-conformance-test
 ```
 
 ## Prerequisites
@@ -432,7 +432,7 @@ there instead of interfering with the binary pipe protocol on stdout.
 To debug a specific test failure, check the log after a run:
 
 ```bash
-scripts/grpc-conformance-test --connectrpc-root /path/to/conformance
+script/grpc-conformance-test --connectrpc-root /path/to/conformance
 cat /tmp/perl-grpc-conformance-client.log
 ```
 

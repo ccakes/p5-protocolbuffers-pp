@@ -6,7 +6,7 @@ This document describes how ProtocolBuffers::PP integrates with the official
 ## Quick Start
 
 ```bash
-scripts/protobuf-conformance-test --protobuf-root /path/to/protobuf
+script/protobuf-conformance-test --protobuf-root /path/to/protobuf
 ```
 
 The suite runs 2737 required tests across proto2 and proto3 message types,
@@ -81,7 +81,7 @@ The protocol uses two protobuf messages defined in `conformance.proto`
 
 ## Components
 
-### `scripts/protobuf-conformance-test` (entry point)
+### `script/protobuf-conformance-test` (entry point)
 
 A bash wrapper that:
 
@@ -192,7 +192,7 @@ binary pipe protocol on stdout.
 To debug a specific test failure, check the log after a run:
 
 ```bash
-scripts/protobuf-conformance-test --protobuf-root /path/to/protobuf
+script/protobuf-conformance-test --protobuf-root /path/to/protobuf
 cat /tmp/perl-conformance-harness.log
 ```
 
