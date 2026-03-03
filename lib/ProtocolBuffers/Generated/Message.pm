@@ -123,3 +123,84 @@ sub __DESCRIPTOR__ {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::Generated::Message - Base class for generated protobuf message classes
+
+=head1 SYNOPSIS
+
+    # Generated code inherits from this class
+    package My::Proto::Message;
+    use parent 'ProtocolBuffers::Generated::Message';
+
+    # Usage
+    my $msg = My::Proto::Message->new(field1 => 'value');
+
+    # Binary encoding/decoding
+    my $bytes = $msg->encode();
+    my $msg2  = My::Proto::Message->decode($bytes);
+
+    # JSON encoding/decoding
+    my $json = $msg->to_json();
+    my $msg3 = My::Proto::Message->from_json($json);
+
+    # Convert to plain hash
+    my $hash = $msg->to_hash();
+
+=head1 DESCRIPTION
+
+Base class for all generated protobuf message classes. Provides constructors,
+binary encoding/decoding, ProtoJSON serialization, and hash conversion.
+Generated subclasses must implement C<__DESCRIPTOR__> to provide their field
+definitions.
+
+Messages are blessed hashrefs. Field access is done via generated accessor
+methods on the subclass. Repeated fields default to empty arrayrefs, map
+fields to empty hashrefs.
+
+=head1 METHODS
+
+=head2 new(%args)
+
+Creates a new message with fields initialized from C<%args>. Repeated fields
+default to C<[]>, map fields to C<{}>. Tracks oneof membership when oneof
+fields are provided.
+
+=head2 encode()
+
+Serializes the message to Protocol Buffers binary format. Returns a byte
+string.
+
+=head2 decode($bytes)
+
+Class method. Decodes binary protobuf bytes into a blessed message object.
+Recursively blesses sub-messages using the C<_class> key from descriptors.
+
+=head2 to_json(%opts)
+
+Serializes the message to a ProtoJSON string. Options are passed through to
+L<ProtocolBuffers::PP::JSON::Print/print_message>.
+
+=head2 from_json($json_string, %opts)
+
+Class method. Parses a ProtoJSON string into a blessed message object.
+Options are passed through to L<ProtocolBuffers::PP::JSON::Parse/parse_message>.
+
+=head2 to_hash()
+
+Returns a plain (unblessed) hashref of the message's field values.
+
+=head2 __DESCRIPTOR__()
+
+Must be implemented by generated subclasses. Returns the message descriptor
+hash containing field definitions, oneof declarations, and type metadata.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::Generated::Base>, L<ProtocolBuffers::PP::Encode>,
+L<ProtocolBuffers::PP::Decode>, L<ProtocolBuffers::PP::Generator>
+
+=cut

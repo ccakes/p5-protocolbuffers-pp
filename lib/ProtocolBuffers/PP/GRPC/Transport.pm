@@ -290,3 +290,99 @@ sub close {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::GRPC::Transport - HTTP/2 transport layer for gRPC
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::GRPC::Transport;
+
+    my $transport = ProtocolBuffers::PP::GRPC::Transport->new('localhost', 50051);
+    my $stream_id = $transport->new_stream(\@headers);
+    $transport->send_data($stream_id, $frame);
+    $transport->close_send($stream_id);
+    $transport->pump_until(sub { $transport->is_closed($stream_id) });
+
+    my $headers  = $transport->response_headers($stream_id);
+    my $data     = $transport->response_data($stream_id);
+    my $trailers = $transport->response_trailers($stream_id);
+    $transport->close();
+
+=head1 DESCRIPTION
+
+Manages an HTTP/2 connection using L<Protocol::HTTP2::Connection> with
+L<Mojo::IOLoop> for async I/O. Provides stream-level operations for the
+gRPC client: creating streams, sending headers/data, receiving responses,
+and cancellation.
+
+Uses prior-knowledge HTTP/2 (h2c, no TLS upgrade). Handles the two-HEADERS
+gRPC pattern (initial response headers + trailing headers with gRPC status)
+via a permissive tied hash for trailer validation.
+
+=head1 METHODS
+
+=head2 new($host, $port)
+
+Connects to the given host and port over TCP, performs the HTTP/2 handshake,
+and returns a transport object.
+
+=head2 new_stream(\@headers)
+
+Creates a new HTTP/2 stream with the given request headers. Returns the
+stream ID. Sets up callbacks for HEADERS and DATA frames.
+
+=head2 send_data($stream_id, $bytes, $end_stream)
+
+Sends data on a stream. C<$end_stream> defaults to false.
+
+=head2 close_send($stream_id)
+
+Sends an empty DATA frame with END_STREAM to signal end of client data.
+
+=head2 cancel($stream_id)
+
+Sends an RST_STREAM with CANCEL error code.
+
+=head2 pump_until(\&condition, $timeout_secs)
+
+Runs the L<Mojo::IOLoop> event loop until C<\&condition> returns true or the
+timeout (default 10 seconds) expires. Dies on connection error or timeout.
+
+=head2 response_headers($stream_id)
+
+Returns the response headers arrayref for the stream.
+
+=head2 response_data($stream_id)
+
+Returns the accumulated response data string for the stream.
+
+=head2 response_trailers($stream_id)
+
+Returns the response trailers arrayref for the stream.
+
+=head2 is_closed($stream_id)
+
+Returns true if the stream is closed.
+
+=head2 is_cancelled($stream_id)
+
+Returns true if the stream was cancelled by the client.
+
+=head2 data_chunks($stream_id)
+
+Returns an arrayref of individual DATA frame payloads received.
+
+=head2 close()
+
+Gracefully shuts down the HTTP/2 connection and closes the TCP socket.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::GRPC::Client>, L<Protocol::HTTP2::Connection>,
+L<Mojo::IOLoop>
+
+=cut

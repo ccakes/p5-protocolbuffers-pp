@@ -296,3 +296,55 @@ sub field_descriptor_proto_descriptor  { $FIELD_DESC }
 sub enum_descriptor_proto_descriptor   { $ENUM_DESC }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Bootstrap - Hand-built descriptors for the protoc plugin protocol
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Bootstrap;
+
+    my $req_desc  = ProtocolBuffers::PP::Bootstrap::code_generator_request_descriptor();
+    my $resp_desc = ProtocolBuffers::PP::Bootstrap::code_generator_response_descriptor();
+
+=head1 DESCRIPTION
+
+Contains hand-coded message descriptors for C<google.protobuf.compiler.CodeGeneratorRequest>,
+C<google.protobuf.compiler.CodeGeneratorResponse>, and all the C<descriptor.proto> types
+they reference. These allow the C<protoc-gen-perl> plugin to decode its own input and
+encode its output without needing generated code.
+
+=head1 FUNCTIONS
+
+=head2 code_generator_request_descriptor()
+
+Returns the descriptor for C<google.protobuf.compiler.CodeGeneratorRequest>.
+
+=head2 code_generator_response_descriptor()
+
+Returns the descriptor for C<google.protobuf.compiler.CodeGeneratorResponse>.
+
+=head2 file_descriptor_proto_descriptor()
+
+Returns the descriptor for C<google.protobuf.FileDescriptorProto>.
+
+=head2 descriptor_proto_descriptor()
+
+Returns the descriptor for C<google.protobuf.DescriptorProto>.
+
+=head2 field_descriptor_proto_descriptor()
+
+Returns the descriptor for C<google.protobuf.FieldDescriptorProto>.
+
+=head2 enum_descriptor_proto_descriptor()
+
+Returns the descriptor for C<google.protobuf.EnumDescriptorProto>.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Generator>, L<ProtocolBuffers::PP::Decode>
+
+=cut

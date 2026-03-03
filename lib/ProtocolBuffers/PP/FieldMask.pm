@@ -35,3 +35,42 @@ sub _camel_to_snake {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::FieldMask - Conversion between protobuf FieldMask and string format
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::FieldMask qw(field_mask_to_string string_to_field_mask);
+
+    my $str = field_mask_to_string({ paths => ['foo_bar', 'baz_qux'] });
+    # "fooBar,bazQux"
+
+    my $msg = string_to_field_mask("fooBar,bazQux");
+    # { paths => ['foo_bar', 'baz_qux'] }
+
+=head1 DESCRIPTION
+
+Converts between C<google.protobuf.FieldMask> message hashes
+(C<{paths =E<gt> [...]}>) and the ProtoJSON string format (comma-separated
+camelCase paths).
+
+=head1 FUNCTIONS
+
+=head2 field_mask_to_string($msg)
+
+Converts a FieldMask hash to a comma-separated string of camelCase paths.
+
+=head2 string_to_field_mask($str)
+
+Parses a comma-separated camelCase string into a FieldMask hash with
+snake_case paths. Returns C<{paths =E<gt> []}> for empty or undefined input.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>, L<ProtocolBuffers::PP::JSON::Parse>
+
+=cut

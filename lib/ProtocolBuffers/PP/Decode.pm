@@ -313,3 +313,47 @@ sub _merge_message {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Decode - Descriptor-driven protobuf binary decoder
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Decode qw(decode_message);
+
+    my $msg = decode_message($descriptor, $bytes);
+
+=head1 DESCRIPTION
+
+Decodes Protocol Buffers binary wire format into a Perl hash using a message
+descriptor. Handles all field types including repeated (packed and unpacked),
+oneof, map, group, and unknown fields.
+
+Repeated fields are initialized as empty arrayrefs, map fields as empty
+hashrefs. Oneof membership is tracked via the C<_oneof_case> key. Unknown
+fields are preserved in C<_unknown_fields> as raw bytes for round-trip
+fidelity. Duplicate message fields are merged recursively per the protobuf
+spec.
+
+C<TYPE_STRING> values have C<utf8::decode> applied so they become Perl
+character strings, which is critical for correct JSON serialization.
+
+=head1 FUNCTIONS
+
+=head2 decode_message($descriptor, $bytes)
+
+Decodes binary protobuf bytes into a message hash using the given descriptor.
+Can also be called as C<decode_message($descriptor, $bytes, $descriptor)>
+(three-argument form used internally).
+
+Returns a plain Perl hash (not blessed).
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Encode>, L<ProtocolBuffers::PP::Types>,
+L<ProtocolBuffers::PP::Wire>
+
+=cut

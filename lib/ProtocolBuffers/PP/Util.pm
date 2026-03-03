@@ -53,3 +53,57 @@ sub int64_to_signed {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Util - Utility functions for protobuf field handling
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Util qw(
+        default_value_for_type is_packable is_numeric_type
+        int32_to_signed int64_to_signed
+    );
+
+    my $default = default_value_for_type(TYPE_STRING);  # ''
+    my $can_pack = is_packable(TYPE_INT32);             # 1
+
+=head1 DESCRIPTION
+
+Helper functions used by the encoder, decoder, and JSON modules for
+determining field defaults, packability, and signed integer conversion.
+
+=head1 FUNCTIONS
+
+=head2 default_value_for_type($type)
+
+Returns the proto3 default value for a field type: empty string for
+C<TYPE_STRING>/C<TYPE_BYTES>, C<0> for numeric/bool types, C<0.0> for
+float/double, C<undef> for C<TYPE_MESSAGE>/C<TYPE_GROUP>.
+
+=head2 is_packable($type)
+
+Returns true if the field type can use packed repeated encoding (all types
+except string, bytes, message, and group).
+
+=head2 is_numeric_type($type)
+
+Alias for C<is_packable>. Returns true for numeric field types.
+
+=head2 int32_to_signed($val)
+
+Converts an unsigned 32-bit integer to its signed two's complement
+representation.
+
+=head2 int64_to_signed($val)
+
+Converts an unsigned 64-bit integer to its signed two's complement
+representation using C<pack>/C<unpack>.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Types>
+
+=cut

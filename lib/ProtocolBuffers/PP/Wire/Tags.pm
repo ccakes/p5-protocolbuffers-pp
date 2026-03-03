@@ -20,3 +20,38 @@ sub decode_tag {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Wire::Tags - Field tag encoding/decoding
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Wire::Tags qw(encode_tag decode_tag);
+
+    my $bytes = encode_tag(1, ProtocolBuffers::PP::Wire::VARINT);
+    my ($field_number, $wire_type) = decode_tag(\$buf, \$pos);
+
+=head1 DESCRIPTION
+
+Encodes and decodes protobuf field tags. A tag is a varint that packs the
+field number (upper bits) and wire type (lower 3 bits).
+
+=head1 FUNCTIONS
+
+=head2 encode_tag($field_number, $wire_type)
+
+Returns the varint-encoded tag bytes for the given field number and wire type.
+
+=head2 decode_tag(\$buffer, \$position)
+
+Decodes a tag from the buffer, advancing the position. Returns a
+C<($field_number, $wire_type)> pair.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Wire>, L<ProtocolBuffers::PP::Wire::Varint>
+
+=cut

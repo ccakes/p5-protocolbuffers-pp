@@ -14,3 +14,35 @@ sub canonical_json_encode {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::JSON::Canonical - Canonical JSON encoding
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::JSON::Canonical qw(canonical_json_encode);
+
+    my $json = canonical_json_encode($data);
+
+=head1 DESCRIPTION
+
+Provides deterministic JSON encoding with sorted keys and big number support.
+Used internally for producing canonical JSON output independent of the
+ProtoJSON format.
+
+=head1 FUNCTIONS
+
+=head2 canonical_json_encode($data)
+
+Encodes a Perl data structure to a canonical JSON string with sorted keys.
+Supports L<Math::BigInt>/L<Math::BigFloat> values via L<JSON::PP>'s
+C<allow_bignum> option.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>
+
+=cut

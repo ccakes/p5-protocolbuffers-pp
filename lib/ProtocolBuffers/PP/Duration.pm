@@ -69,3 +69,47 @@ sub string_to_duration {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Duration - Conversion between protobuf Duration and string format
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Duration qw(duration_to_string string_to_duration);
+
+    my $str = duration_to_string({ seconds => 90, nanos => 500000000 });
+    # "90.5s"
+
+    my $msg = string_to_duration("90.5s");
+    # { seconds => 90, nanos => 500000000 }
+
+=head1 DESCRIPTION
+
+Converts between C<google.protobuf.Duration> message hashes (C<{seconds, nanos}>)
+and the ProtoJSON string format (e.g., C<"1.5s">, C<"-30s">).
+
+Validates that seconds and nanos have consistent signs, and that seconds
+are within the allowed range (E<plusmn>315,576,000,000).
+
+=head1 FUNCTIONS
+
+=head2 duration_to_string($msg)
+
+Converts a C<{seconds, nanos}> hash to a duration string (e.g., C<"1.5s">).
+Fractional seconds are included only when nanos is non-zero, with trailing
+zeros trimmed.
+
+=head2 string_to_duration($str)
+
+Parses a duration string (e.g., C<"-30.5s">) into a C<{seconds, nanos}> hash.
+Throws a L<ProtocolBuffers::PP::Error> on invalid format or out-of-range
+values.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>, L<ProtocolBuffers::PP::JSON::Parse>
+
+=cut

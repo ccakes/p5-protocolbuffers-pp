@@ -24,3 +24,40 @@ sub zigzag_decode {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Wire::ZigZag - ZigZag encoding for signed integers
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Wire::ZigZag qw(zigzag_encode zigzag_decode);
+
+    my $encoded = zigzag_encode(-1);   # 1
+    my $decoded = zigzag_decode(1);    # -1
+
+=head1 DESCRIPTION
+
+Implements ZigZag encoding used by protobuf C<sint32> and C<sint64> types.
+ZigZag maps signed integers to unsigned integers so that small absolute values
+have small encoded representations (unlike standard two's complement, where -1
+encodes as a 10-byte varint).
+
+=head1 FUNCTIONS
+
+=head2 zigzag_encode($value)
+
+Encodes a signed integer using ZigZag mapping:
+C<0 E<rarr> 0, -1 E<rarr> 1, 1 E<rarr> 2, -2 E<rarr> 3, ...>
+
+=head2 zigzag_decode($value)
+
+Decodes a ZigZag-encoded unsigned integer back to its signed value.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Wire::Varint>
+
+=cut

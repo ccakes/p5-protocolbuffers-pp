@@ -366,3 +366,77 @@ sub _print_wrapper {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::JSON::Print - Message-to-ProtoJSON serializer
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::JSON::Print qw(print_message);
+
+    my $json = print_message($msg, $descriptor, %opts);
+
+=head1 DESCRIPTION
+
+Converts a protobuf message hash to its canonical ProtoJSON string
+representation. Implements the full Proto3 JSON mapping including:
+
+=over 4
+
+=item *
+
+Proto3 default value omission for singular fields
+
+=item *
+
+64-bit integers serialized as strings
+
+=item *
+
+Bytes fields serialized as base64
+
+=item *
+
+Enum values serialized as names (falling back to numbers)
+
+=item *
+
+Float/double special values (NaN, Infinity) as strings
+
+=item *
+
+Full Well-Known Type (WKT) support: Timestamp, Duration, FieldMask,
+Any, Struct, Value, ListValue, and all wrapper types
+
+=back
+
+Uses a C<FloatLiteral> helper (a L<Math::BigFloat> subclass) to preserve
+exact float formatting through L<JSON::PP> serialization.
+
+=head1 FUNCTIONS
+
+=head2 print_message($msg, $descriptor, %opts)
+
+Serializes a message hash to a JSON string. Options:
+
+=over 4
+
+=item emit_defaults
+
+If true, emit fields even when set to their default values.
+
+=item type_registry
+
+Hashref mapping full type names to C<{ descriptor =E<gt> ... }> entries.
+Required for serializing C<google.protobuf.Any> fields.
+
+=back
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Parse>, L<ProtocolBuffers::PP::JSON>
+
+=cut

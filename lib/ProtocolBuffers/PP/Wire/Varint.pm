@@ -45,3 +45,40 @@ sub decode_varint {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Wire::Varint - Variable-length integer encoding/decoding
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Wire::Varint qw(encode_varint decode_varint);
+
+    my $bytes = encode_varint(300);        # "\xac\x02"
+    my $val   = decode_varint(\$buf, \$pos);
+
+=head1 DESCRIPTION
+
+Implements the Protocol Buffers base-128 varint encoding. Negative values are
+encoded as 10-byte two's complement unsigned 64-bit integers.
+
+=head1 FUNCTIONS
+
+=head2 encode_varint($value)
+
+Encodes an integer as a varint byte string. Negative values are converted to
+their unsigned 64-bit two's complement representation before encoding.
+
+=head2 decode_varint(\$buffer, \$position)
+
+Decodes a varint from C<$buffer> starting at C<$position>. Advances
+C<$position> past the consumed bytes. Throws a
+L<ProtocolBuffers::PP::Error> on truncation or if the varint exceeds 64 bits.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Wire>, L<ProtocolBuffers::PP::Wire::ZigZag>
+
+=cut

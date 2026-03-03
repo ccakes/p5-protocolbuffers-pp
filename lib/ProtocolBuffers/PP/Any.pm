@@ -97,3 +97,50 @@ sub json_to_any {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Any - Helper functions for google.protobuf.Any JSON conversion
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Any qw(any_to_json json_to_any);
+
+    my $json_hash = any_to_json($any_msg,
+        type_registry => \%registry,
+        json_printer  => \&printer,
+    );
+
+    my $any_msg = json_to_any($json_hash,
+        type_registry => \%registry,
+        json_parser   => \&parser,
+    );
+
+=head1 DESCRIPTION
+
+Provides conversion helpers for C<google.protobuf.Any> messages. An Any
+wraps an arbitrary message as C<{type_url, value}> where C<value> is the
+binary-encoded inner message.
+
+Well-Known Types use C<{"@type": ..., "value": ...}> JSON format, while
+regular messages merge their fields alongside C<@type>.
+
+=head1 FUNCTIONS
+
+=head2 any_to_json($msg, %opts)
+
+Converts an Any message hash to a JSON-ready Perl hash. Requires
+C<type_registry> and C<json_printer> options.
+
+=head2 json_to_any($json_data, %opts)
+
+Converts a JSON hash (with C<@type> key) to an Any message hash. Requires
+C<type_registry> and C<json_parser> options.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>, L<ProtocolBuffers::PP::JSON::Parse>
+
+=cut

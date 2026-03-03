@@ -96,3 +96,47 @@ sub _timegm {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Timestamp - Conversion between protobuf Timestamp and RFC 3339 strings
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Timestamp qw(timestamp_to_string string_to_timestamp);
+
+    my $str = timestamp_to_string({ seconds => 1234567890, nanos => 0 });
+    # "2009-02-13T23:31:30Z"
+
+    my $msg = string_to_timestamp("2009-02-13T23:31:30Z");
+    # { seconds => 1234567890, nanos => 0 }
+
+=head1 DESCRIPTION
+
+Converts between C<google.protobuf.Timestamp> message hashes (C<{seconds, nanos}>)
+and RFC 3339 formatted strings as required by the ProtoJSON specification.
+
+Supports nanosecond precision with trailing zero trimming, timezone offsets,
+and validates the allowed timestamp range (0001-01-01 to 9999-12-31).
+
+=head1 FUNCTIONS
+
+=head2 timestamp_to_string($msg)
+
+Converts a C<{seconds, nanos}> hash to an RFC 3339 string (always UTC with
+"Z" suffix). Fractional seconds are included only when nanos is non-zero,
+with trailing zeros trimmed.
+
+=head2 string_to_timestamp($str)
+
+Parses an RFC 3339 string into a C<{seconds, nanos}> hash. Handles timezone
+offsets by converting to UTC. Throws a L<ProtocolBuffers::PP::Error> on
+invalid format or out-of-range values.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>, L<ProtocolBuffers::PP::JSON::Parse>
+
+=cut

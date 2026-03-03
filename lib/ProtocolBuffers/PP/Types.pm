@@ -69,3 +69,51 @@ sub wire_type_for_field_type {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Types - Protocol Buffers field type and label constants
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Types qw(
+        TYPE_INT32 TYPE_STRING TYPE_MESSAGE LABEL_REPEATED
+        wire_type_for_field_type
+    );
+
+    my $wire_type = wire_type_for_field_type(TYPE_INT32);
+
+=head1 DESCRIPTION
+
+Defines constants corresponding to C<FieldDescriptorProto.Type> and
+C<FieldDescriptorProto.Label> values from the Protocol Buffers specification,
+plus a mapping function from field types to wire types.
+
+=head1 CONSTANTS
+
+=head2 Field Types
+
+    TYPE_DOUBLE   (1)    TYPE_FLOAT    (2)    TYPE_INT64    (3)
+    TYPE_UINT64   (4)    TYPE_INT32    (5)    TYPE_FIXED64  (6)
+    TYPE_FIXED32  (7)    TYPE_BOOL     (8)    TYPE_STRING   (9)
+    TYPE_GROUP    (10)   TYPE_MESSAGE  (11)   TYPE_BYTES    (12)
+    TYPE_UINT32   (13)   TYPE_ENUM     (14)   TYPE_SFIXED32 (15)
+    TYPE_SFIXED64 (16)   TYPE_SINT32   (17)   TYPE_SINT64   (18)
+
+=head2 Labels
+
+    LABEL_OPTIONAL (1)   LABEL_REQUIRED (2)   LABEL_REPEATED (3)
+
+=head1 FUNCTIONS
+
+=head2 wire_type_for_field_type($type)
+
+Returns the protobuf wire type constant for a given field type.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Wire>, L<ProtocolBuffers::PP::Util>
+
+=cut

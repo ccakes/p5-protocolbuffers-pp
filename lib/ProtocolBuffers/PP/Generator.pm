@@ -475,3 +475,65 @@ sub _quote {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Generator - Generates Perl packages from protobuf descriptors
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Generator;
+
+    my $gen = ProtocolBuffers::PP::Generator->new(request => $code_gen_request);
+    my $response = $gen->generate();
+
+    # $response->{file} contains an array of { name => $path, content => $code }
+
+=head1 DESCRIPTION
+
+Code generator used by C<protoc-gen-perl>. Takes a decoded
+C<CodeGeneratorRequest> (from protoc) and produces Perl source files containing
+message classes, enum classes, and gRPC service client stubs.
+
+Each generated message class inherits from L<ProtocolBuffers::Generated::Message>
+and provides:
+
+=over 4
+
+=item *
+
+A C<__DESCRIPTOR__> method returning the field descriptor hash (with
+lazy-resolved cross-references for sub-messages).
+
+=item *
+
+Accessor methods for each field, with oneof clearing logic for oneof members.
+
+=back
+
+Each generated enum class inherits from L<ProtocolBuffers::Generated::Enum> and
+provides C<name_for>/C<value_for> lookups.
+
+=head1 METHODS
+
+=head2 new(%args)
+
+    my $gen = ProtocolBuffers::PP::Generator->new(request => $request);
+
+Constructor. Takes a C<request> parameter containing a decoded
+C<CodeGeneratorRequest> hash.
+
+=head2 generate()
+
+Processes all proto files listed in C<file_to_generate>, builds a type
+registry, and returns a C<CodeGeneratorResponse> hash with the generated
+Perl source files.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Bootstrap>, L<ProtocolBuffers::Generated::Message>,
+L<ProtocolBuffers::Generated::Enum>
+
+=cut

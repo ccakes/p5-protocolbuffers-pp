@@ -193,3 +193,48 @@ sub _encode_map_entry {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Encode - Descriptor-driven protobuf binary encoder
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Encode qw(encode_message encode_scalar_value);
+
+    my $bytes = encode_message($msg_hash, $descriptor);
+
+    # Encode a single scalar value (for map entries, etc.)
+    my $bytes = encode_scalar_value($value, TYPE_INT32);
+
+=head1 DESCRIPTION
+
+Encodes a Perl hash into Protocol Buffers binary wire format using a message
+descriptor. Handles all field types including singular, repeated (packed and
+unpacked), oneof, map, and group fields.
+
+Fields are encoded in field number order for deterministic output. Proto3
+default value omission is applied to non-oneof, non-optional singular fields.
+Unknown fields stored in C<_unknown_fields> are appended to preserve
+round-trip fidelity.
+
+=head1 FUNCTIONS
+
+=head2 encode_message($msg, $descriptor)
+
+Encodes a message hash into binary protobuf bytes using the given descriptor.
+Returns a byte string.
+
+=head2 encode_scalar_value($value, $type)
+
+Encodes a single scalar value for the given field type. Does not include a
+field tag. Useful for encoding individual values outside a full message context.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Decode>, L<ProtocolBuffers::PP::Types>,
+L<ProtocolBuffers::PP::Wire>
+
+=cut

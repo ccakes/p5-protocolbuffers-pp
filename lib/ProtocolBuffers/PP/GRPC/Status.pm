@@ -57,3 +57,50 @@ sub name_for {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::GRPC::Status - gRPC status code constants
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::GRPC::Status qw(:all);
+
+    if ($result->{grpc_status} == OK) { ... }
+    if ($result->{grpc_status} == DEADLINE_EXCEEDED) { ... }
+
+    my $name = ProtocolBuffers::PP::GRPC::Status::name_for(4);
+    # "DEADLINE_EXCEEDED"
+
+=head1 DESCRIPTION
+
+Defines the standard gRPC status codes as constants and provides a name
+lookup function. All constants can be imported individually or via the
+C<:all> export tag.
+
+=head1 CONSTANTS
+
+    OK                  (0)     CANCELLED           (1)
+    UNKNOWN             (2)     INVALID_ARGUMENT    (3)
+    DEADLINE_EXCEEDED   (4)     NOT_FOUND           (5)
+    ALREADY_EXISTS      (6)     PERMISSION_DENIED   (7)
+    RESOURCE_EXHAUSTED  (8)     FAILED_PRECONDITION (9)
+    ABORTED             (10)    OUT_OF_RANGE        (11)
+    UNIMPLEMENTED       (12)    INTERNAL            (13)
+    UNAVAILABLE         (14)    DATA_LOSS           (15)
+    UNAUTHENTICATED     (16)
+
+=head1 FUNCTIONS
+
+=head2 name_for($code)
+
+Returns the string name for a numeric gRPC status code. Returns C<'UNKNOWN'>
+for unrecognized codes.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::GRPC::Client>
+
+=cut

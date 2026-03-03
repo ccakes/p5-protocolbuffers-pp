@@ -97,3 +97,74 @@ sub _check_len {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::Wire::Bytes - Fixed-width and length-delimited wire encoding
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::Wire::Bytes qw(
+        encode_fixed32 decode_fixed32
+        encode_double  decode_double
+        encode_length_delimited decode_length_delimited
+    );
+
+    my $bytes = encode_fixed32(42);
+    my $val   = decode_fixed32(\$buf, \$pos);
+
+    my $ld = encode_length_delimited("hello");
+    my $str = decode_length_delimited(\$buf, \$pos);
+
+=head1 DESCRIPTION
+
+Implements encoding and decoding for all protobuf fixed-width wire types
+(fixed32, fixed64, sfixed32, sfixed64, float, double) and length-delimited
+fields (strings, bytes, embedded messages).
+
+All decode functions take a buffer reference and a position reference,
+advancing the position past the consumed bytes.
+
+=head1 FUNCTIONS
+
+=head2 encode_fixed32($value) / decode_fixed32(\$buf, \$pos)
+
+Unsigned 32-bit little-endian integer.
+
+=head2 encode_fixed64($value) / decode_fixed64(\$buf, \$pos)
+
+Unsigned 64-bit little-endian integer.
+
+=head2 encode_sfixed32($value) / decode_sfixed32(\$buf, \$pos)
+
+Signed 32-bit little-endian integer.
+
+=head2 encode_sfixed64($value) / decode_sfixed64(\$buf, \$pos)
+
+Signed 64-bit little-endian integer.
+
+=head2 encode_float($value) / decode_float(\$buf, \$pos)
+
+IEEE 754 single-precision (32-bit) float, little-endian.
+
+=head2 encode_double($value) / decode_double(\$buf, \$pos)
+
+IEEE 754 double-precision (64-bit) float, little-endian.
+
+=head2 encode_length_delimited($data)
+
+Prepends a varint-encoded length to C<$data>. Handles Perl's UTF-8 flag
+by encoding character strings to bytes before measuring length.
+
+=head2 decode_length_delimited(\$buf, \$pos)
+
+Reads a varint length prefix then extracts that many bytes. Throws a
+L<ProtocolBuffers::PP::Error> on truncation.
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::Wire>, L<ProtocolBuffers::PP::Wire::Varint>
+
+=cut

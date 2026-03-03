@@ -626,3 +626,123 @@ sub _http_to_grpc_status {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::GRPC::Client - Pure-Perl gRPC client over HTTP/2
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::GRPC::Client;
+
+    my $client = ProtocolBuffers::PP::GRPC::Client->new(
+        host    => 'localhost',
+        port    => 50051,
+        timeout => 5000,  # milliseconds
+    );
+
+    # Unary RPC
+    my $result = $client->unary('/package.Service/Method', $request_bytes,
+        headers => [['x-custom', ['value']]],
+    );
+
+    # Server streaming RPC
+    my $result = $client->server_stream('/package.Service/Method', $request_bytes);
+
+    # Client streaming RPC
+    my $result = $client->client_stream('/package.Service/Method', \@request_list);
+
+    # Bidirectional streaming RPC
+    my $result = $client->bidi_stream('/package.Service/Method', \@requests,
+        full_duplex => 1,
+    );
+
+    # Result structure
+    # {
+    #     messages    => [@response_bytes],
+    #     headers     => [[$name, [@values]], ...],
+    #     trailers    => [[$name, [@values]], ...],
+    #     grpc_status => 0,              # gRPC status code
+    #     grpc_message => undef,         # error message if any
+    # }
+
+=head1 DESCRIPTION
+
+A pure-Perl gRPC client that communicates over HTTP/2 using
+L<ProtocolBuffers::PP::GRPC::Transport>. Supports all four RPC patterns:
+unary, server streaming, client streaming, and bidirectional streaming.
+
+Features include client-side deadline enforcement, request cancellation
+(by time or response count), metadata (headers/trailers) support, and
+gRPC framing with compression detection.
+
+=head1 METHODS
+
+=head2 new(%opts)
+
+Constructor. Options:
+
+=over 4
+
+=item host
+
+Server hostname (default: C<'localhost'>).
+
+=item port
+
+Server port (default: C<50051>).
+
+=item timeout
+
+Default timeout in milliseconds. Sent as C<grpc-timeout> header.
+
+=item metadata
+
+Default metadata headers as an arrayref of C<[$name, [@values]]> pairs.
+
+=back
+
+=head2 unary($path, $request_bytes, %opts)
+
+Sends a single request and expects exactly one response. Returns a result
+hash. Reports C<UNIMPLEMENTED> if the server sends zero or multiple responses
+on an OK status.
+
+=head2 server_stream($path, $request_bytes, %opts)
+
+Sends a single request and receives zero or more responses.
+
+=head2 client_stream($path, \@request_list, %opts)
+
+Sends multiple requests and expects exactly one response. Supports
+C<request_delay_ms> for pacing.
+
+=head2 bidi_stream($path, \@requests, %opts)
+
+Bidirectional streaming. Options:
+
+=over 4
+
+=item full_duplex
+
+If true, interleaves sends and receives (send one, wait for response, repeat).
+If false (default), sends all requests then reads all responses.
+
+=item request_delay_ms
+
+Delay between requests in milliseconds.
+
+=item cancel
+
+Hashref controlling cancellation: C<after_close_send_ms>,
+C<after_num_responses>, or C<before_close_send>.
+
+=back
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::GRPC::Transport>, L<ProtocolBuffers::PP::GRPC::Status>
+
+=cut

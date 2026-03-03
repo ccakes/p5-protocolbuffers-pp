@@ -555,3 +555,79 @@ sub _parse_wrapper {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+ProtocolBuffers::PP::JSON::Parse - ProtoJSON-to-message deserializer
+
+=head1 SYNOPSIS
+
+    use ProtocolBuffers::PP::JSON::Parse qw(parse_message);
+
+    my $msg = parse_message($json_string, $descriptor, %opts);
+
+=head1 DESCRIPTION
+
+Parses a ProtoJSON string into a protobuf message hash. Implements the full
+Proto3 JSON mapping including:
+
+=over 4
+
+=item *
+
+Field lookup by both JSON name (camelCase) and proto name (snake_case)
+
+=item *
+
+64-bit integers accepted as JSON strings or numbers
+
+=item *
+
+Bytes fields parsed from base64 (standard and URL-safe)
+
+=item *
+
+Enum values parsed by name or numeric value
+
+=item *
+
+Integer range validation for all integer types
+
+=item *
+
+Full Well-Known Type (WKT) support: Timestamp, Duration, FieldMask,
+Any, Struct, Value, ListValue, and all wrapper types
+
+=back
+
+Uses C<B::svref_2object> to inspect Perl SV flags for distinguishing JSON
+numbers from JSON strings, which is essential for correct
+C<google.protobuf.Value> mapping.
+
+=head1 FUNCTIONS
+
+=head2 parse_message($json, $descriptor, %opts)
+
+Parses a JSON string (or pre-decoded Perl data structure) into a message
+hash. Options:
+
+=over 4
+
+=item ignore_unknown_fields
+
+If true, silently skip JSON keys that don't match any field in the
+descriptor. Otherwise, throws a L<ProtocolBuffers::PP::Error>.
+
+=item type_registry
+
+Hashref for resolving C<google.protobuf.Any> types.
+
+=back
+
+=head1 SEE ALSO
+
+L<ProtocolBuffers::PP::JSON::Print>, L<ProtocolBuffers::PP::JSON>
+
+=cut
