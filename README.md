@@ -1,14 +1,15 @@
 # ProtocolBuffers::PP
 
-A **pure Perl** implementation of [Google Protocol Buffers](https://protobuf.dev/) with full proto2/proto3 support, canonical JSON mapping, and a `protoc` code generator plugin.
+A **pure Perl** implementation of [Google Protocol Buffers](https://protobuf.dev/) with full proto2/proto3 support, canonical JSON mapping, a `protoc` code generator plugin, and a gRPC client.
 
-Passes **all 2737 required tests** in the official protobuf conformance suite.
+Passes **all 2737 required tests** in the official protobuf conformance suite and **all 211 tests** in the ConnectRPC gRPC conformance suite.
 
 ## Features
 
 - **Binary wire format** encoding and decoding (varint, zigzag, fixed-width, length-delimited, groups)
 - **Canonical JSON mapping** (ProtoJSON) with proper lowerCamelCase field names, int64-as-string, bytes-as-base64, enum-as-name
 - **Well-Known Types** with special JSON representations: Timestamp, Duration, FieldMask, Any, Struct/Value/ListValue, Wrappers
+- **gRPC client** over HTTP/2 with unary, client-streaming, server-streaming, and bidirectional streaming support
 - **`protoc-gen-perl`** plugin generates Perl packages from `.proto` files
 - **No XS or compiled extensions** required
 
@@ -73,44 +74,17 @@ my $json = ProtocolBuffers::PP::JSON::Print::print_message($msg, $desc);
 my $parsed = ProtocolBuffers::PP::JSON::Parse::parse_message($json, $desc);
 ```
 
-## Project Structure
+## Project Layout
 
-```
-lib/
-  ProtocolBuffers/
-    PP.pm                    # Version
-    PP/
-      Encode.pm              # Binary protobuf encoder
-      Decode.pm              # Binary protobuf decoder
-      Generator.pm           # protoc-gen-perl code generator
-      Bootstrap.pm           # Self-hosted descriptor decoding
-      Types.pm               # Field type constants
-      Util.pm                # Default values, helpers
-      Error.pm               # Structured error handling
-      JSON/
-        Print.pm             # Message -> JSON
-        Parse.pm             # JSON -> Message
-      Wire/
-        Varint.pm            # Variable-length integer encoding
-        ZigZag.pm            # Signed integer zigzag encoding
-        Bytes.pm             # Fixed-width and length-delimited encoding
-        Tags.pm              # Field tag encoding/decoding
-      Timestamp.pm           # google.protobuf.Timestamp helpers
-      Duration.pm            # google.protobuf.Duration helpers
-      FieldMask.pm           # google.protobuf.FieldMask helpers
-      Any.pm                 # google.protobuf.Any helpers
-    Generated/
-      Base.pm                # Base class for generated code
-      Message.pm             # Message base class
-      Enum.pm                # Enum base class
-      Map.pm                 # Map field support
-script/
-  protoc-gen-perl            # protoc plugin
-  perl-conformance-harness   # Conformance test runner
-t/
-  unit/                      # Unit tests (225 tests)
-  conformance/               # Conformance suite configuration
-```
+| Directory | Contents |
+|---|---|
+| `lib/ProtocolBuffers/PP/` | Runtime: encoding, decoding, JSON mapping, gRPC client, wire format, WKT helpers |
+| `lib/ProtocolBuffers/Generated/` | Base classes for generated message/enum code |
+| `script/` | `protoc-gen-perl` plugin, conformance harness and gRPC client |
+| `scripts/` | Conformance test wrapper scripts (protobuf and gRPC) |
+| `conformance/` | Conformance config and known-failing lists |
+| `docs/` | Feature documentation |
+| `t/unit/` | Unit tests |
 
 ## Testing
 
@@ -118,17 +92,25 @@ t/
 # Run unit tests
 prove -r t/unit/
 
-# Run the official protobuf conformance suite (requires conformance_test_runner binary)
-./conformance-runner
+# Run the official protobuf conformance suite
+scripts/protobuf-conformance-test --protobuf-root /path/to/protobuf
+
+# Run the gRPC conformance suite
+scripts/grpc-conformance-test --connectrpc-root /path/to/connectrpc-conformance
 ```
+
+The conformance wrapper scripts generate types into a temp directory via
+`protoc` and locate the test runner binary automatically. See
+[docs/protobuf-conformance.md](docs/protobuf-conformance.md) and
+[docs/grpc-conformance.md](docs/grpc-conformance.md) for details.
 
 ## Conformance Status
 
 | Suite | Result |
 |-------|--------|
-| Required tests | **2737/2737 passing** |
-| Recommended tests | 33 warnings (non-blocking) |
-| Edition tests | Skipped (not supported) |
+| Protobuf required tests | **2737/2737 passing** |
+| Protobuf recommended tests | 33 warnings (non-blocking) |
+| gRPC conformance tests | **211/211 passing** |
 
 ## License
 
