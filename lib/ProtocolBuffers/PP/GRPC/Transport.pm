@@ -24,10 +24,11 @@ use Protocol::HTTP2::Constants qw(
 }
 
 sub new {
-    my ($class, $host, $port) = @_;
+    my ($class, $host, $port, %opts) = @_;
     my $self = bless {
         host        => $host,
         port        => $port,
+        tls         => $opts{tls} || 0,
         con         => undef,
         mojo_stream => undef,
         input       => '',
@@ -62,9 +63,17 @@ sub _connect {
     $self->{con} = $con;
 
     my $done = 0;
+    my @tls_opts;
+    if ($self->{tls}) {
+        @tls_opts = (
+            tls         => 1,
+            tls_options => { SSL_alpn_protocols => ['h2'] },
+        );
+    }
     Mojo::IOLoop->client(
         address => $self->{host},
         port    => $self->{port},
+        @tls_opts,
         sub {
             my ($loop, $err, $stream) = @_;
             if ($err) {

@@ -12,6 +12,7 @@ sub new {
     return bless {
         host     => $opts{host} || 'localhost',
         port     => $opts{port} || 50051,
+        tls      => $opts{tls} || 0,
         timeout  => $opts{timeout},
         metadata => $opts{metadata} || [],
     }, $class;
@@ -144,7 +145,9 @@ sub bidi_stream {
 
 sub _new_transport {
     my ($self) = @_;
-    return ProtocolBuffers::PP::GRPC::Transport->new($self->{host}, $self->{port});
+    return ProtocolBuffers::PP::GRPC::Transport->new(
+        $self->{host}, $self->{port}, tls => $self->{tls},
+    );
 }
 
 sub _start_stream {
@@ -152,7 +155,7 @@ sub _start_stream {
 
     my @headers = (
         ':method'       => 'POST',
-        ':scheme'       => 'http',
+        ':scheme'       => ($self->{tls} ? 'https' : 'http'),
         ':path'         => $path,
         ':authority'    => "$self->{host}:$self->{port}",
         'content-type'  => 'application/grpc+proto',

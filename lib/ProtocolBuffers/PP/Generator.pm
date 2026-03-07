@@ -359,7 +359,9 @@ sub _generate_service {
     my $client_class = "${perl_class}::Client";
 
     my $code = "{\npackage $client_class;\n";
-    $code .= "use strict;\nuse warnings;\n\n";
+    $code .= "use strict;\nuse warnings;\n";
+    $code .= "use ProtocolBuffers::PP::Encode qw(encode_message);\n";
+    $code .= "use ProtocolBuffers::PP::Decode qw(decode_message);\n\n";
 
     $code .= "sub new {\n";
     $code .= "    my (\$class, \%args) = \@_;\n";
@@ -370,11 +372,17 @@ sub _generate_service {
         my $name   = $method->{name};
         my $cs     = $method->{client_streaming} ? 1 : 0;
         my $ss     = $method->{server_streaming} ? 1 : 0;
-        my $path   = "/$package.$svc->{name}/$name";
-        # Convert dotted package to slash-separated
-        $path =~ s/\./\//g while $path =~ /\./;
-        # Actually gRPC path uses dots: /package.Service/Method
-        $path = "/$package.$svc->{name}/$name";
+
+        # gRPC path: /package.Service/Method (or /Service/Method if no package)
+        my $path = $package ne '' ? "/$package.$svc->{name}/$name" : "/$svc->{name}/$name";
+
+        # Resolve input/output Perl class names from type registry
+        my $input_type  = $method->{input_type}  || '';
+        my $output_type = $method->{output_type} || '';
+        my $input_info  = $self->{type_registry}{$input_type};
+        my $output_info = $self->{type_registry}{$output_type};
+        my $input_class  = $input_info  ? $input_info->{perl_class}  : '';
+        my $output_class = $output_info ? $output_info->{perl_class} : '';
 
         my $rpc_type;
         if (!$cs && !$ss) {
@@ -388,12 +396,41 @@ sub _generate_service {
         }
 
         $code .= "sub $name {\n";
-        $code .= "    my (\$self, \$request, \%opts) = \@_;\n";
-        $code .= "    return \$self->{channel}->$rpc_type(\n";
-        $code .= "        " . _quote($path) . ",\n";
-        $code .= "        \$request,\n";
-        $code .= "        \%opts,\n";
-        $code .= "    );\n";
+
+        if (!$cs) {
+            # Unary or server-streaming: single request message
+            $code .= "    my (\$self, \$request, \%opts) = \@_;\n";
+            $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
+            $code .= "    my \$req_bytes = encode_message(\$request, \$req_desc);\n";
+            $code .= "    my \$result = \$self->{channel}->$rpc_type(\n";
+            $code .= "        " . _quote($path) . ", \$req_bytes, \%opts,\n";
+            $code .= "    );\n";
+        } else {
+            # Client-streaming or bidi: list of request messages
+            $code .= "    my (\$self, \$requests, \%opts) = \@_;\n";
+            $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
+            $code .= "    my \@req_bytes = map { encode_message(\$_, \$req_desc) } \@\$requests;\n";
+            $code .= "    my \$result = \$self->{channel}->$rpc_type(\n";
+            $code .= "        " . _quote($path) . ", \\\@req_bytes, \%opts,\n";
+            $code .= "    );\n";
+        }
+
+        # Error handling
+        $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
+        $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
+        $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
+        $code .= "    }\n";
+
+        # Decode response(s)
+        $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
+        if (!$ss) {
+            # Unary or client-streaming: single response
+            $code .= "    return decode_message(\$resp_desc, \$result->{messages}[0], \$resp_desc);\n";
+        } else {
+            # Server-streaming or bidi: list of responses
+            $code .= "    return [ map { decode_message(\$resp_desc, \$_, \$resp_desc) } \@{\$result->{messages}} ];\n";
+        }
+
         $code .= "}\n\n";
     }
 
