@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
+
+use v5.36;
 use strict;
 use warnings;
+
 use FindBin;
 use lib "$FindBin::RealBin/lib";
 use lib "$FindBin::RealBin/../lib";
@@ -21,23 +24,47 @@ my $channel = ProtocolBuffers::PP::GRPC::Client->new(
 my $client = HelloService::Client->new(channel => $channel);
 
 # --- Unary RPC ---
-print "=== SayHello (unary) ===\n";
+say "=== SayHello (unary) ===";
 my $response = $client->SayHello({ greeting => 'Perl' });
-print "  Sent:     Perl\n";
-print "  Received: $response->{reply}\n\n";
+say "  Sent:     Perl";
+say "  Received: $response->{reply}\n";
 
-# --- Server streaming RPC ---
-print "=== LotsOfReplies (server streaming) ===\n";
+# --- Server streaming RPC (sync) ---
+say "=== LotsOfReplies (server streaming, sync) ===";
 my $replies = $client->LotsOfReplies({ greeting => 'Stream-ee' });
-print "  Sent:    Stream-ee\n";
+say "  Sent:    Stream-ee";
 for my $i (0 .. $#$replies) {
-    print "  Reply ${\($i+1)}: $replies->[$i]{reply}\n";
+    say "  Reply ${\($i+1)}: $replies->[$i]{reply}";
 }
-print "\n";
+say "\n";
 
-# --- Client streaming RPC (5 greetings) ---
-print "=== LotsOfGreetings (client streaming, 5 messages) ===\n";
-print "  Sent:     Stream-er #1..5\n";
+# --- Server streaming RPC (async with callbacks) ---
+say "=== LotsOfReplies (server streaming, async) ===";
+my $reply_num = 0;
+my $call = $client->LotsOfReplies(
+    { greeting => 'Async-ee' },
+    on_message => sub ($msg) { $reply_num++; say "  Reply $reply_num: $msg->{reply}" },
+    on_close   => sub ($status, $msg, @) { say "  Stream closed (status=$status)" },
+);
+$call->wait;
+say "\n";
+
+# --- Client streaming RPC (sync) ---
+say "=== LotsOfGreetings (client streaming, sync) ===";
+say "  Sent:     Stream-er #1..5";
 my @greetings = map { { greeting => "Stream-er #$_" } } 1 .. 5;
 my $summary = $client->LotsOfGreetings(\@greetings);
-print "  Received: $summary->{reply}\n";
+say "  Received: $summary->{reply}\n";
+
+# --- Client streaming RPC (async) ---
+say "=== LotsOfGreetings (client streaming, async) ===";
+my $cs_call = $client->LotsOfGreetings(
+    on_message => sub ($msg) { say "  Received: $msg->{reply}" },
+    on_close   => sub ($status, @) { say "  Stream closed (status=$status)" },
+);
+for my $i (1 .. 3) {
+    say "  Sending: Async-er #$i";
+    $cs_call->send({ greeting => "Async-er #$i" });
+}
+$cs_call->close_send;
+$cs_call->wait;

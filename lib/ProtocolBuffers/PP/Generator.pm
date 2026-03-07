@@ -363,6 +363,8 @@ sub _generate_service {
     $code .= "use ProtocolBuffers::PP::Encode qw(encode_message);\n";
     $code .= "use ProtocolBuffers::PP::Decode qw(decode_message);\n\n";
 
+    $code .= "use ProtocolBuffers::PP::GRPC::Call;\n\n";
+
     $code .= "sub new {\n";
     $code .= "    my (\$class, \%args) = \@_;\n";
     $code .= "    return bless { channel => \$args{channel} }, \$class;\n";
@@ -397,37 +399,106 @@ sub _generate_service {
 
         $code .= "sub $name {\n";
 
-        if (!$cs) {
-            # Unary or server-streaming: single request message
+        if (!$cs && !$ss) {
+            # Unary: synchronous only
             $code .= "    my (\$self, \$request, \%opts) = \@_;\n";
             $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
             $code .= "    my \$req_bytes = encode_message(\$request, \$req_desc);\n";
-            $code .= "    my \$result = \$self->{channel}->$rpc_type(\n";
+            $code .= "    my \$result = \$self->{channel}->unary(\n";
             $code .= "        " . _quote($path) . ", \$req_bytes, \%opts,\n";
             $code .= "    );\n";
-        } else {
-            # Client-streaming or bidi: list of request messages
-            $code .= "    my (\$self, \$requests, \%opts) = \@_;\n";
+            $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
+            $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
+            $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
+            $code .= "    }\n";
+            $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
+            $code .= "    return decode_message(\$resp_desc, \$result->{messages}[0], \$resp_desc);\n";
+        } elsif (!$cs && $ss) {
+            # Server streaming: dual-mode
+            $code .= "    my (\$self, \$request, \%opts) = \@_;\n";
             $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
+            $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
+            $code .= "    if (\$opts{on_message}) {\n";
+            $code .= "        return \$self->{channel}->streaming_call(\n";
+            $code .= "            " . _quote($path) . ",\n";
+            $code .= "            request           => \$request,\n";
+            $code .= "            input_descriptor  => \$req_desc,\n";
+            $code .= "            output_descriptor => \$resp_desc,\n";
+            $code .= "            on_message        => \$opts{on_message},\n";
+            $code .= "            on_close          => \$opts{on_close},\n";
+            $code .= "            on_headers        => \$opts{on_headers},\n";
+            $code .= "            on_trailers       => \$opts{on_trailers},\n";
+            $code .= "            timeout           => \$opts{timeout},\n";
+            $code .= "            headers           => \$opts{headers},\n";
+            $code .= "        );\n";
+            $code .= "    }\n";
+            $code .= "    my \$req_bytes = encode_message(\$request, \$req_desc);\n";
+            $code .= "    my \$result = \$self->{channel}->server_stream(\n";
+            $code .= "        " . _quote($path) . ", \$req_bytes, \%opts,\n";
+            $code .= "    );\n";
+            $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
+            $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
+            $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
+            $code .= "    }\n";
+            $code .= "    return [ map { decode_message(\$resp_desc, \$_, \$resp_desc) } \@{\$result->{messages}} ];\n";
+        } elsif ($cs && !$ss) {
+            # Client streaming: dual-mode
+            $code .= "    my \$self = shift;\n";
+            $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
+            $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
+            $code .= "    # Check if first arg is an on_message callback (async) or arrayref (sync)\n";
+            $code .= "    if (ref \$_[0] ne 'ARRAY') {\n";
+            $code .= "        my \%opts = \@_;\n";
+            $code .= "        return \$self->{channel}->streaming_call(\n";
+            $code .= "            " . _quote($path) . ",\n";
+            $code .= "            input_descriptor  => \$req_desc,\n";
+            $code .= "            output_descriptor => \$resp_desc,\n";
+            $code .= "            on_message        => \$opts{on_message},\n";
+            $code .= "            on_close          => \$opts{on_close},\n";
+            $code .= "            on_headers        => \$opts{on_headers},\n";
+            $code .= "            on_trailers       => \$opts{on_trailers},\n";
+            $code .= "            timeout           => \$opts{timeout},\n";
+            $code .= "            headers           => \$opts{headers},\n";
+            $code .= "        );\n";
+            $code .= "    }\n";
+            $code .= "    my (\$requests, \%opts) = \@_;\n";
             $code .= "    my \@req_bytes = map { encode_message(\$_, \$req_desc) } \@\$requests;\n";
-            $code .= "    my \$result = \$self->{channel}->$rpc_type(\n";
+            $code .= "    my \$result = \$self->{channel}->client_stream(\n";
             $code .= "        " . _quote($path) . ", \\\@req_bytes, \%opts,\n";
             $code .= "    );\n";
-        }
-
-        # Error handling
-        $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
-        $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
-        $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
-        $code .= "    }\n";
-
-        # Decode response(s)
-        $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
-        if (!$ss) {
-            # Unary or client-streaming: single response
+            $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
+            $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
+            $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
+            $code .= "    }\n";
             $code .= "    return decode_message(\$resp_desc, \$result->{messages}[0], \$resp_desc);\n";
         } else {
-            # Server-streaming or bidi: list of responses
+            # Bidi streaming: dual-mode
+            $code .= "    my \$self = shift;\n";
+            $code .= "    my \$req_desc = ${input_class}->__DESCRIPTOR__;\n";
+            $code .= "    my \$resp_desc = ${output_class}->__DESCRIPTOR__;\n";
+            $code .= "    if (ref \$_[0] ne 'ARRAY') {\n";
+            $code .= "        my \%opts = \@_;\n";
+            $code .= "        return \$self->{channel}->streaming_call(\n";
+            $code .= "            " . _quote($path) . ",\n";
+            $code .= "            input_descriptor  => \$req_desc,\n";
+            $code .= "            output_descriptor => \$resp_desc,\n";
+            $code .= "            on_message        => \$opts{on_message},\n";
+            $code .= "            on_close          => \$opts{on_close},\n";
+            $code .= "            on_headers        => \$opts{on_headers},\n";
+            $code .= "            on_trailers       => \$opts{on_trailers},\n";
+            $code .= "            timeout           => \$opts{timeout},\n";
+            $code .= "            headers           => \$opts{headers},\n";
+            $code .= "        );\n";
+            $code .= "    }\n";
+            $code .= "    my (\$requests, \%opts) = \@_;\n";
+            $code .= "    my \@req_bytes = map { encode_message(\$_, \$req_desc) } \@\$requests;\n";
+            $code .= "    my \$result = \$self->{channel}->bidi_stream(\n";
+            $code .= "        " . _quote($path) . ", \\\@req_bytes, \%opts,\n";
+            $code .= "    );\n";
+            $code .= "    if (defined \$result->{grpc_status} && \$result->{grpc_status} != 0) {\n";
+            $code .= "        die \"gRPC error (status \$result->{grpc_status}): \"\n";
+            $code .= "            . (\$result->{grpc_message} // 'unknown') . \"\\n\";\n";
+            $code .= "    }\n";
             $code .= "    return [ map { decode_message(\$resp_desc, \$_, \$resp_desc) } \@{\$result->{messages}} ];\n";
         }
 

@@ -6,6 +6,7 @@ use Time::HiRes ();
 use Mojo::IOLoop;
 use ProtocolBuffers::PP::GRPC::Transport;
 use ProtocolBuffers::PP::GRPC::Status qw(:all);
+use ProtocolBuffers::PP::GRPC::Call;
 
 sub new {
     my ($class, %opts) = @_;
@@ -141,6 +142,40 @@ sub bidi_stream {
     }
 }
 
+sub streaming_call {
+    my ($self, $path, %opts) = @_;
+    my $transport = $self->_new_transport();
+
+    my $call = ProtocolBuffers::PP::GRPC::Call->new(
+        transport         => $transport,
+        stream_id         => undef,  # set after new_stream
+        client            => $self,
+        input_descriptor  => $opts{input_descriptor},
+        output_descriptor => $opts{output_descriptor},
+        on_message        => $opts{on_message},
+        on_close          => $opts{on_close},
+        on_headers        => $opts{on_headers},
+        on_trailers       => $opts{on_trailers},
+    );
+
+    my $stream_id = $self->_start_stream($transport, $path,
+        %opts,
+        _on_data    => sub { $call->_on_data(@_) },
+        _on_headers => sub { $call->_on_headers(@_) },
+        _on_close   => sub { $call->_on_stream_close() },
+    );
+    $call->{stream_id} = $stream_id;
+
+    $self->_setup_timeout($transport, $stream_id, %opts);
+
+    if (exists $opts{request}) {
+        $call->send($opts{request});
+        $call->close_send;
+    }
+
+    return $call;
+}
+
 # ---- Internal helpers ----
 
 sub _new_transport {
@@ -180,7 +215,12 @@ sub _start_stream {
         }
     }
 
-    return $transport->new_stream(\@headers);
+    my %stream_opts;
+    $stream_opts{on_data}    = $opts{_on_data}    if $opts{_on_data};
+    $stream_opts{on_headers} = $opts{_on_headers}  if $opts{_on_headers};
+    $stream_opts{on_close}   = $opts{_on_close}    if $opts{_on_close};
+
+    return $transport->new_stream(\@headers, %stream_opts);
 }
 
 # Client-side deadline enforcement

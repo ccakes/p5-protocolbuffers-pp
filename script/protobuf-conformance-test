@@ -75,6 +75,7 @@ protoc \
     --perl_out="$tmpdir" \
     --plugin=protoc-gen-perl="$ROOT_DIR/script/protoc-gen-perl" \
     -I "$PROTOBUF_ROOT/src" \
+    -I "$PROTOBUF_ROOT" \
     google/protobuf/any.proto \
     google/protobuf/timestamp.proto \
     google/protobuf/duration.proto \

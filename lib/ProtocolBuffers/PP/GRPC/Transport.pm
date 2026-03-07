@@ -52,6 +52,9 @@ sub _connect {
             warn "H2 stream $stream_id state: $prev -> $curr\n" if $ENV{GRPC_DEBUG};
             if ($curr == CLOSED && exists $self->{streams}{$stream_id}) {
                 $self->{streams}{$stream_id}{closed} = 1;
+                if (my $cb = $self->{streams}{$stream_id}{on_close_cb}) {
+                    $cb->();
+                }
             }
         },
         on_error => sub {
@@ -159,7 +162,7 @@ sub _flush {
 }
 
 sub new_stream {
-    my ($self, $headers) = @_;
+    my ($self, $headers, %opts) = @_;
 
     my $con       = $self->{con};
     my $stream_id = $con->new_stream;
@@ -173,6 +176,9 @@ sub new_stream {
         closed            => 0,
         headers_count     => 0,
         sent_end_stream   => 0,
+        on_data_cb        => $opts{on_data},
+        on_headers_cb     => $opts{on_headers},
+        on_close_cb       => $opts{on_close},
     };
 
     # Track HEADERS frames: first = response headers, second = trailers
@@ -202,6 +208,7 @@ sub new_stream {
         } else {
             $state->{response_trailers} = $hdrs;
         }
+        $state->{on_headers_cb}->($hdrs, $state->{headers_count}) if $state->{on_headers_cb};
     });
 
     # Accumulate DATA frames
@@ -211,6 +218,7 @@ sub new_stream {
         my $state = $self->{streams}{$stream_id};
         $state->{response_data} .= $data;
         push @{$state->{data_chunks}}, $data;
+        $state->{on_data_cb}->($data) if $state->{on_data_cb};
     });
 
     # Send HEADERS without END_STREAM

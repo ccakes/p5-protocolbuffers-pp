@@ -106,6 +106,8 @@ use warnings;
 use ProtocolBuffers::PP::Encode qw(encode_message);
 use ProtocolBuffers::PP::Decode qw(decode_message);
 
+use ProtocolBuffers::PP::GRPC::Call;
+
 sub new {
     my ($class, %args) = @_;
     return bless { channel => $args{channel} }, $class;
@@ -129,6 +131,21 @@ sub SayHello {
 sub LotsOfReplies {
     my ($self, $request, %opts) = @_;
     my $req_desc = HelloRequest->__DESCRIPTOR__;
+    my $resp_desc = HelloResponse->__DESCRIPTOR__;
+    if ($opts{on_message}) {
+        return $self->{channel}->streaming_call(
+            '/HelloService/LotsOfReplies',
+            request           => $request,
+            input_descriptor  => $req_desc,
+            output_descriptor => $resp_desc,
+            on_message        => $opts{on_message},
+            on_close          => $opts{on_close},
+            on_headers        => $opts{on_headers},
+            on_trailers       => $opts{on_trailers},
+            timeout           => $opts{timeout},
+            headers           => $opts{headers},
+        );
+    }
     my $req_bytes = encode_message($request, $req_desc);
     my $result = $self->{channel}->server_stream(
         '/HelloService/LotsOfReplies', $req_bytes, %opts,
@@ -137,13 +154,29 @@ sub LotsOfReplies {
         die "gRPC error (status $result->{grpc_status}): "
             . ($result->{grpc_message} // 'unknown') . "\n";
     }
-    my $resp_desc = HelloResponse->__DESCRIPTOR__;
     return [ map { decode_message($resp_desc, $_, $resp_desc) } @{$result->{messages}} ];
 }
 
 sub LotsOfGreetings {
-    my ($self, $requests, %opts) = @_;
+    my $self = shift;
     my $req_desc = HelloRequest->__DESCRIPTOR__;
+    my $resp_desc = HelloResponse->__DESCRIPTOR__;
+    # Check if first arg is an on_message callback (async) or arrayref (sync)
+    if (ref $_[0] ne 'ARRAY') {
+        my %opts = @_;
+        return $self->{channel}->streaming_call(
+            '/HelloService/LotsOfGreetings',
+            input_descriptor  => $req_desc,
+            output_descriptor => $resp_desc,
+            on_message        => $opts{on_message},
+            on_close          => $opts{on_close},
+            on_headers        => $opts{on_headers},
+            on_trailers       => $opts{on_trailers},
+            timeout           => $opts{timeout},
+            headers           => $opts{headers},
+        );
+    }
+    my ($requests, %opts) = @_;
     my @req_bytes = map { encode_message($_, $req_desc) } @$requests;
     my $result = $self->{channel}->client_stream(
         '/HelloService/LotsOfGreetings', \@req_bytes, %opts,
@@ -152,13 +185,28 @@ sub LotsOfGreetings {
         die "gRPC error (status $result->{grpc_status}): "
             . ($result->{grpc_message} // 'unknown') . "\n";
     }
-    my $resp_desc = HelloResponse->__DESCRIPTOR__;
     return decode_message($resp_desc, $result->{messages}[0], $resp_desc);
 }
 
 sub BidiHello {
-    my ($self, $requests, %opts) = @_;
+    my $self = shift;
     my $req_desc = HelloRequest->__DESCRIPTOR__;
+    my $resp_desc = HelloResponse->__DESCRIPTOR__;
+    if (ref $_[0] ne 'ARRAY') {
+        my %opts = @_;
+        return $self->{channel}->streaming_call(
+            '/HelloService/BidiHello',
+            input_descriptor  => $req_desc,
+            output_descriptor => $resp_desc,
+            on_message        => $opts{on_message},
+            on_close          => $opts{on_close},
+            on_headers        => $opts{on_headers},
+            on_trailers       => $opts{on_trailers},
+            timeout           => $opts{timeout},
+            headers           => $opts{headers},
+        );
+    }
+    my ($requests, %opts) = @_;
     my @req_bytes = map { encode_message($_, $req_desc) } @$requests;
     my $result = $self->{channel}->bidi_stream(
         '/HelloService/BidiHello', \@req_bytes, %opts,
@@ -167,7 +215,6 @@ sub BidiHello {
         die "gRPC error (status $result->{grpc_status}): "
             . ($result->{grpc_message} // 'unknown') . "\n";
     }
-    my $resp_desc = HelloResponse->__DESCRIPTOR__;
     return [ map { decode_message($resp_desc, $_, $resp_desc) } @{$result->{messages}} ];
 }
 
