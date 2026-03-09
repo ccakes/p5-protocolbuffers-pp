@@ -23,13 +23,35 @@ my $channel = ProtocolBuffers::PP::GRPC::Client->new(
 # Create typed service client
 my $client = HelloService::Client->new(channel => $channel);
 
-# --- Unary RPC ---
+=head1 RPC Types
+
+=head2 Unary RPC
+
+First consider the simplest type of RPC where the client sends a single request
+and gets back a single response.
+
+=cut
+
 say "=== SayHello (unary) ===";
 my $response = $client->SayHello({ greeting => 'Perl' });
 say "  Sent:     Perl";
 say "  Received: $response->{reply}\n";
 
-# --- Server streaming RPC (sync) ---
+=head2 Server streaming RPC
+
+A server-streaming RPC is similar to a unary RPC, except that the server returns
+a stream of messages in response to a client’s request. After sending all its
+messages, the server’s status details (status code and optional status message)
+and optional trailing metadata are sent to the client. This completes processing
+on the server side. The client completes once it has all the server’s messages.
+
+=head3 Synchronous
+
+The sync interface sends the client -> server message and then waits for the
+server to close the request before returning an arrayref of response messages.
+
+=cut
+
 say "=== LotsOfReplies (server streaming, sync) ===";
 my $replies = $client->LotsOfReplies({ greeting => 'Stream-ee' });
 say "  Sent:    Stream-ee";
@@ -38,7 +60,14 @@ for my $i (0 .. $#$replies) {
 }
 say "\n";
 
-# --- Server streaming RPC (async with callbacks) ---
+=head3 Asynchronous
+
+The async interface allows the caller to register callbacks for C<on_message>
+and C<on_close>. C<on_message> is called for each received message in the
+stream and C<on_close> is called when the server closes the stream or on error.
+
+=cut
+
 say "=== LotsOfReplies (server streaming, async) ===";
 my $reply_num = 0;
 my $call = $client->LotsOfReplies(
@@ -49,14 +78,35 @@ my $call = $client->LotsOfReplies(
 $call->wait;
 say "\n";
 
-# --- Client streaming RPC (sync) ---
+=head2 Client streaming RPC
+
+A client-streaming RPC is similar to a unary RPC, except that the client sends a
+stream of messages to the server instead of a single message. The server responds
+with a single message (along with its status details and optional trailing
+metadata), typically but not necessarily after it has received all the client's
+messages.
+
+=head3 Synchronous
+
+The sync interface sends the full list of client -> server messages at once and
+waits for the server response before returning.
+
+=cut
+
 say "=== LotsOfGreetings (client streaming, sync) ===";
 say "  Sent:     Stream-er #1..5";
 my @greetings = map { { greeting => "Stream-er #$_" } } 1 .. 5;
 my $summary = $client->LotsOfGreetings(\@greetings);
 say "  Received: $summary->{reply}\n";
 
-# --- Client streaming RPC (async) ---
+=head3 Asynchronous
+
+The async interface allows the caller to register the same C<on_message> and
+C<on_error> callbacks. The caller can also use the C<send> method to send
+messages to the server on the stream.
+
+=cut
+
 say "=== LotsOfGreetings (client streaming, async) ===";
 my $cs_call = $client->LotsOfGreetings(
     on_message => sub ($msg) { say "  Received: $msg->{reply}" },
