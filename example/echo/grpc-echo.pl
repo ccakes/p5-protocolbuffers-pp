@@ -6,7 +6,7 @@ use warnings;
 
 use FindBin;
 use lib "$FindBin::RealBin/lib";
-use lib "$FindBin::RealBin/../lib";
+use lib "$FindBin::RealBin/../../lib";
 
 use ProtocolBuffers::PP::GRPC::Client;
 
