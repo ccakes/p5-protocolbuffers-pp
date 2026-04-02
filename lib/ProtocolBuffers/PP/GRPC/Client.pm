@@ -203,9 +203,17 @@ sub _start_stream {
         push @headers, 'grpc-timeout' => "${timeout}m";
     }
 
-    # User-provided metadata
+    # Channel-level default metadata
     # Note: binary header values (-bin suffix) are expected to be already
     # base64-encoded, matching the gRPC wire format convention.
+    for my $h (@{$self->{metadata}}) {
+        my $name = $h->[0];
+        for my $val (@{$h->[1]}) {
+            push @headers, $name => $val;
+        }
+    }
+
+    # Per-call metadata (overrides channel defaults)
     if ($opts{headers}) {
         for my $h (@{$opts{headers}}) {
             my $name = $h->[0];
