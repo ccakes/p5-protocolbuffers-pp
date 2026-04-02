@@ -74,6 +74,46 @@ my $json = ProtocolBuffers::PP::JSON::Print::print_message($msg, $desc);
 my $parsed = ProtocolBuffers::PP::JSON::Parse::parse_message($json, $desc);
 ```
 
+### gRPC Client
+
+The gRPC client supports unary, client-streaming, server-streaming, and bidirectional RPCs over HTTP/2 with optional TLS.
+
+The code generator produces typed service client stubs from proto `service` definitions:
+
+```perl
+use ProtocolBuffers::PP::GRPC::Client;
+use Your::Proto::Service;  # generated from your .proto
+
+my $channel = ProtocolBuffers::PP::GRPC::Client->new(
+    host     => 'router.example.com',
+    port     => 57777,
+    tls      => 1,
+    timeout  => 10000,
+    metadata => [
+        ['username', ['admin']],
+        ['password', ['secret']],
+    ],
+);
+
+my $client = Your::Proto::Service::Client->new(channel => $channel);
+
+# Unary RPC
+my $response = $client->SomeMethod({ field => 'value' });
+
+# Server streaming (synchronous - returns all messages)
+my $messages = $client->ServerStream($request);
+
+# Server streaming (async - callback per message)
+$client->ServerStream($request,
+    on_message => sub { my ($msg) = @_; ... },
+    on_close   => sub { my (%result) = @_; ... },
+);
+```
+
+Channel-level `metadata` is sent with every RPC. Per-call metadata can be passed via the `headers` option on individual calls.
+
+See `example/gnmi/` for a working gNMI client that queries network device capabilities and operational state.
+
 ## Project Layout
 
 | Directory | Contents |
@@ -81,6 +121,7 @@ my $parsed = ProtocolBuffers::PP::JSON::Parse::parse_message($json, $desc);
 | `lib/ProtocolBuffers/PP/` | Runtime: encoding, decoding, JSON mapping, gRPC client, wire format, WKT helpers |
 | `lib/ProtocolBuffers/Generated/` | Base classes for generated message/enum code |
 | `script/` | `protoc-gen-perl` plugin, conformance harnesses, and test wrapper scripts |
+| `example/` | Working examples: gNMI client, gRPC echo client |
 | `conformance/` | Conformance config and known-failing lists |
 | `docs/` | Feature documentation |
 | `t/unit/` | Unit tests |
