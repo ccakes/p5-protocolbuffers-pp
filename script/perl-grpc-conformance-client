@@ -18,6 +18,7 @@ use MIME::Base64 ();
 
 # Load generated types
 my $gendir = $ENV{PROTOBUF_PP_GENDIR} || "$FindBin::RealBin/../lib";
+require lib; lib->import($gendir);
 do "$gendir/Google/Protobuf/Any.pm"    or die "Failed to load Any: $@";
 do "$gendir/Google/Protobuf/Empty.pm"  or die "Failed to load Empty: $@";
 do "$gendir/Google/Protobuf/Struct.pm" or die "Failed to load Struct: $@";

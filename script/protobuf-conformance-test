@@ -14,7 +14,7 @@ Options:
   --protobuf-root DIR   Path to the protobuf source tree (or set \$PROTOBUF_ROOT)
 
 The conformance_test_runner binary is located at:
-  1. \$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner
+  1. \$PROTOBUF_ROOT/conformance_test_runner
   2. On \$PATH
 
 Example:
@@ -55,13 +55,13 @@ fi
 
 # Find conformance_test_runner
 RUNNER=""
-if [[ -x "$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner" ]]; then
-    RUNNER="$PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner"
+if [[ -x "$PROTOBUF_ROOT/conformance_test_runner" ]]; then
+    RUNNER="$PROTOBUF_ROOT/conformance_test_runner"
 elif command -v conformance_test_runner &>/dev/null; then
     RUNNER="$(command -v conformance_test_runner)"
 else
     echo "Error: conformance_test_runner not found." >&2
-    echo "  Checked: $PROTOBUF_ROOT/bazel-bin/conformance/conformance_test_runner" >&2
+    echo "  Checked: $PROTOBUF_ROOT/conformance_test_runner" >&2
     echo "  Checked: \$PATH" >&2
     exit 1
 fi
